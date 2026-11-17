@@ -5,6 +5,7 @@ const game = @import("game");
 const World = game.world.World;
 const Event = game.events.Event;
 const debug = @import("ui/debug.zig");
+const bench = @import("ui/bench.zig");
 const Renderer = @import("ui/render.zig").Renderer;
 
 const game_path = "data/game.zon";
@@ -32,6 +33,10 @@ pub fn main(init: std.process.Init) !void {
     defer rl.closeWindow();
     const renderer: Renderer = try .init(width, height);
     defer renderer.deinit();
+
+    // `--bench`: mede quantas entidades cabem antes de o FPS cair, e sai.
+    const args = try init.minimal.args.toSlice(init.arena.allocator());
+    if (args.len > 1 and std.mem.eql(u8, args[1], "--bench")) return bench.run(gpa, config, renderer);
 
     const step = 1.0 / @as(f32, @floatFromInt(config.ticks_per_second));
     var pending: f32 = 0;
