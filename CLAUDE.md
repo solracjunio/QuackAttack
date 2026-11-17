@@ -1,4 +1,4 @@
-# QuackAtack
+# QuackAttack
 
 Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `PLANO.md`.
 

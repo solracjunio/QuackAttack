@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
     });
     exe_mod.linkLibrary(raylib_dep.artifact("raylib"));
 
-    const exe = b.addExecutable(.{ .name = "quackatack", .root_module = exe_mod });
+    const exe = b.addExecutable(.{ .name = "quackattack", .root_module = exe_mod });
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);

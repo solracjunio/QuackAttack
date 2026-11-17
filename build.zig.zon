@@ -1,7 +1,7 @@
 .{
-    .name = .quackatack,
+    .name = .quackattack,
     .version = "0.0.0",
-    .fingerprint = 0x19b3411bded509bb, // Changing this has security and trust implications.
+    .fingerprint = 0x2e84d43b1f7daa62, // Changing this has security and trust implications.
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .raylib_zig = .{

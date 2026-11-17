@@ -1,4 +1,4 @@
-# QuackAtack: plano do MVP
+# QuackAttack: plano do MVP
 
 Roguelite de fila, escrito em **Zig** com o **Claude Code**: uma fila que anda como cobra, unidades que atacam sozinhas e ondas de inimigos. Jogo original, com nome e arte próprios.
 
@@ -53,7 +53,7 @@ Cada ideia precisa aparecer pelo menos uma vez no MVP, senão o post não tem o 
 ## Estrutura de pastas
 
 ```
-QuackAtack/
+QuackAttack/
 ├── build.zig  build.zig.zon
 ├── CLAUDE.md          ← regras do projeto para o Claude
 ├── PLANO.md           ← este arquivo

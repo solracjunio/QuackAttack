@@ -8,7 +8,7 @@ const window_height = 540;
 pub fn main() void {
     _ = game;
 
-    rl.initWindow(window_width, window_height, "QuackAtack");
+    rl.initWindow(window_width, window_height, "QuackAttack");
     defer rl.closeWindow();
     rl.setTargetFPS(60);
 
@@ -16,6 +16,6 @@ pub fn main() void {
         rl.beginDrawing();
         defer rl.endDrawing();
         rl.clearBackground(.dark_green);
-        rl.drawText("QuackAtack", 20, 20, 32, .yellow);
+        rl.drawText("QuackAttack", 20, 20, 32, .yellow);
     }
 }
