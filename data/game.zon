@@ -13,7 +13,8 @@
         .radius = 18,
     },
     .queue = .{
-        .start_ducks = 4,
+        // Classe de cada patinho no começo, da frente para trás (nomes de data/classes.zon).
+        .start_classes = .{ "arqueiro", "mago", "arqueiro", "arqueiro" },
         .spacing = 36,
         .radius = 14,
         .life = 10,
@@ -26,10 +27,4 @@
         .contact_damage = 1,
     },
     .spawner = .{ .interval = 1.2 },
-    .archer = .{
-        .range = 230,
-        .cooldown = 0.7,
-        .damage = 1,
-    },
-    .projectile = .{ .speed = 420, .radius = 4 },
 }

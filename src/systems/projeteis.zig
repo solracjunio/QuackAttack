@@ -12,20 +12,20 @@ pub fn update(w: *World, gpa: std.mem.Allocator, dt: f32) !void {
     for (0..w.projectiles.slots()) |i| {
         if (!w.projectiles.isAlive(i)) continue;
         p.items(.pos)[i] += vec.scale(p.items(.velocity)[i], dt);
-        p.items(.remaining)[i] -= w.config.projectile.speed * dt;
+        p.items(.remaining)[i] -= vec.length(p.items(.velocity)[i]) * dt;
         const h = w.projectiles.handleAt(i);
         if (p.items(.remaining)[i] <= 0) {
             w.projectiles.remove(h);
-        } else if (touchedEnemy(w.*, p.items(.pos)[i])) |enemy| {
-            try w.events.append(gpa, .{ .damage = .{ .target = .{ .enemy = enemy }, .amount = w.config.archer.damage } });
+        } else if (touchedEnemy(w.*, p.items(.pos)[i], p.items(.radius)[i])) |enemy| {
+            try w.events.append(gpa, .{ .damage = .{ .target = .{ .enemy = enemy }, .amount = p.items(.damage)[i] } });
             w.projectiles.remove(h);
         }
     }
 }
 
-/// Primeiro inimigo vivo que encosta numa flecha em `pos`.
-fn touchedEnemy(w: World, pos: Vec2) ?Handle {
-    const reach = w.config.projectile.radius + w.config.enemy.radius;
+/// Primeiro inimigo vivo que encosta numa flecha de raio `radius` em `pos`.
+fn touchedEnemy(w: World, pos: Vec2, radius: f32) ?Handle {
+    const reach = radius + w.config.enemy.radius;
     for (w.enemies.items.items(.pos), 0..) |enemy_pos, i| {
         if (!w.enemies.isAlive(i)) continue;
         if (vec.length(enemy_pos - pos) <= reach) return w.enemies.handleAt(i);
@@ -35,12 +35,12 @@ fn touchedEnemy(w: World, pos: Vec2) ?Handle {
 
 const config_example = @import("../config.zig").example;
 
-/// Mundo do exemplo com uma flecha em `pos` indo para +x com a velocidade e o
-/// alcance do exemplo (400/s, 200). Raio da flecha 4, do inimigo 10: encostam a 14.
+/// Mundo do exemplo com uma flecha do arqueiro do exemplo em `pos`, indo para
+/// +x (400/s, 200 de voo, dano 1). Raio da flecha 4, do inimigo 10: encostam a 14.
 fn worldWithArrow(gpa: std.mem.Allocator, pos: Vec2) !World {
-    const cfg = config_example();
-    var w: World = try .init(gpa, cfg);
-    _ = try w.projectiles.add(gpa, .{ .pos = pos, .velocity = .{ cfg.projectile.speed, 0 }, .remaining = cfg.archer.range });
+    const arrow = @import("../classes.zig").example[0].attack.projectile;
+    var w: World = try .init(gpa, config_example());
+    _ = try w.projectiles.add(gpa, .{ .pos = pos, .velocity = .{ arrow.speed, 0 }, .remaining = arrow.range, .damage = arrow.damage, .radius = arrow.radius });
     return w;
 }
 
@@ -73,7 +73,7 @@ test "update: encostar num inimigo gera evento de dano e a flecha some; a vida n
     try std.testing.expectEqual(1, w.events.items.len);
     const d = w.events.items[0].damage;
     try std.testing.expectEqual(h, d.target.enemy);
-    try std.testing.expectEqual(w.config.archer.damage, d.amount);
+    try std.testing.expectEqual(1, d.amount);
     try std.testing.expectEqual(3, w.enemies.items.items(.health)[0].current);
 }
 

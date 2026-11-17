@@ -1,6 +1,8 @@
 //! Formato do `data/game.zon`: todos os números de balanceamento do jogo.
 const std = @import("std");
 const vec = @import("vec.zig");
+const classes_mod = @import("classes.zig");
+const Class = classes_mod.Class;
 const Vec2 = vec.Vec2;
 
 pub const Config = struct {
@@ -21,7 +23,8 @@ pub const Config = struct {
         radius: f32,
     },
     queue: struct {
-        start_ducks: u32,
+        /// Classe de cada patinho no começo, da frente para trás (nomes de `classes`).
+        start_classes: []const []const u8,
         /// Distância entre patinhos, medida ao longo do caminho da líder.
         spacing: f32,
         radius: f32,
@@ -41,17 +44,8 @@ pub const Config = struct {
         /// Segundos entre um inimigo e o próximo.
         interval: f32,
     },
-    archer: struct {
-        /// Distância máxima do alvo e do voo da flecha.
-        range: f32,
-        /// Segundos entre um tiro e o próximo.
-        cooldown: f32,
-        damage: u32,
-    },
-    projectile: struct {
-        speed: f32,
-        radius: f32,
-    },
+    /// Vem de `data/classes.zon` (outro arquivo): o `main` preenche depois de ler.
+    classes: []const Class = &.{},
 };
 
 pub const ParseError = error{ OutOfMemory, ParseZon };
@@ -81,14 +75,18 @@ pub fn validate(c: Config) ?[]const u8 {
         .{ c.enemy.life > 0, "enemy.life precisa ser maior que 0" },
         .{ c.enemy.contact_damage > 0, "enemy.contact_damage precisa ser maior que 0" },
         .{ c.spawner.interval > 0, "spawner.interval precisa ser maior que 0" },
-        .{ c.archer.range > 0, "archer.range precisa ser maior que 0" },
-        .{ c.archer.cooldown > 0, "archer.cooldown precisa ser maior que 0" },
-        .{ c.archer.damage > 0, "archer.damage precisa ser maior que 0" },
-        .{ c.projectile.speed > 0, "projectile.speed precisa ser maior que 0" },
-        .{ c.projectile.radius > 0, "projectile.radius precisa ser maior que 0" },
     };
     for (checks) |check| {
         if (!check[0]) return check[1];
+    }
+    if (classes_mod.validate(c.classes)) |problem| return problem;
+    return startClassesProblem(c);
+}
+
+fn startClassesProblem(c: Config) ?[]const u8 {
+    if (c.queue.start_classes.len == 0) return "queue.start_classes precisa de pelo menos um patinho";
+    for (c.queue.start_classes) |name| {
+        if (classes_mod.find(c.classes, name) == null) return "queue.start_classes cita uma classe que não existe em classes.zon";
     }
     return null;
 }
@@ -104,8 +102,14 @@ pub fn example() Config {
     var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
     defer arena.deinit();
     var diag: std.zon.parse.Diagnostics = undefined;
-    return parse(arena.allocator(), sample, &diag) catch unreachable;
+    var c = parse(arena.allocator(), sample, &diag) catch unreachable;
+    // Os nomes do texto morrem com o arena: o exemplo usa a lista fixa abaixo.
+    c.queue.start_classes = &example_start_classes;
+    c.classes = classes_mod.example;
+    return c;
 }
+
+const example_start_classes = [_][]const u8{ "arqueiro", "arqueiro", "mago" };
 
 const sample =
     \\.{
@@ -113,11 +117,9 @@ const sample =
     \\    .ticks_per_second = 60,
     \\    .world = .{ .width = 800, .height = 600 },
     \\    .leader = .{ .start = .{ 400, 300 }, .start_heading = .{ 1, 0 }, .speed = 150, .turn_speed = 3, .radius = 12 },
-    \\    .queue = .{ .start_ducks = 3, .spacing = 26, .radius = 10, .life = 10, .invulnerable_time = 1 },
+    \\    .queue = .{ .start_classes = .{ "arqueiro", "arqueiro", "mago" }, .spacing = 26, .radius = 10, .life = 10, .invulnerable_time = 1 },
     \\    .enemy = .{ .radius = 10, .speed = 60, .life = 3, .contact_damage = 2 },
     \\    .spawner = .{ .interval = 2 },
-    \\    .archer = .{ .range = 200, .cooldown = 0.5, .damage = 1 },
-    \\    .projectile = .{ .speed = 400, .radius = 4 },
     \\}
 ;
 
@@ -129,9 +131,9 @@ test "parse: lê o ZON da configuração" {
     try std.testing.expectEqual(60, c.ticks_per_second);
     try std.testing.expectEqual(800, c.world.width);
     try std.testing.expectEqual(300, c.leader.start[1]);
-    try std.testing.expectEqual(3, c.queue.start_ducks);
+    try std.testing.expectEqual(3, c.queue.start_classes.len);
+    try std.testing.expectEqualStrings("mago", c.queue.start_classes[2]);
     try std.testing.expectEqual(42, c.seed);
-    try std.testing.expectEqual(400, c.projectile.speed);
 }
 
 test "parse: campo faltando é erro" {
@@ -192,21 +194,6 @@ test "validate: recusa valores que quebram o jogo" {
     c = base;
     c.spawner.interval = 0;
     try std.testing.expect(validate(c) != null);
-    c = base;
-    c.archer.range = 0;
-    try std.testing.expect(validate(c) != null);
-    c = base;
-    c.archer.cooldown = 0;
-    try std.testing.expect(validate(c) != null);
-    c = base;
-    c.archer.damage = 0;
-    try std.testing.expect(validate(c) != null);
-    c = base;
-    c.projectile.speed = 0;
-    try std.testing.expect(validate(c) != null);
-    c = base;
-    c.projectile.radius = 0;
-    try std.testing.expect(validate(c) != null);
 }
 
 test "validate: invulnerable_time 0 é válido (sem invulnerabilidade)" {
@@ -232,5 +219,19 @@ test "validate: a líder precisa começar dentro do mundo, com o raio" {
     c.leader.start = .{ 789, 300 };
     try std.testing.expect(validate(c) != null);
     c.leader.start = .{ 400, 11 };
+    try std.testing.expect(validate(c) != null);
+}
+
+test "validate: classes inválidas ou classe inicial que não existe" {
+    var c = example();
+    c.classes = &.{};
+    try std.testing.expect(validate(c) != null);
+
+    c = example();
+    c.queue.start_classes = &.{ "arqueiro", "bardo" };
+    try std.testing.expect(validate(c) != null);
+
+    c = example();
+    c.queue.start_classes = &.{};
     try std.testing.expect(validate(c) != null);
 }

@@ -8,6 +8,8 @@ const Trail = @import("trail.zig").Trail;
 const Health = @import("health.zig").Health;
 const Pool = @import("pool.zig").Pool;
 const Event = @import("events.zig").Event;
+const classes = @import("classes.zig");
+const relations = @import("relations.zig");
 
 pub const Leader = struct {
     pos: Vec2,
@@ -17,6 +19,8 @@ pub const Leader = struct {
 
 pub const Duck = struct {
     pos: Vec2,
+    /// Índice em `config.classes`.
+    class: u32,
     /// Segundos até poder atirar de novo.
     cooldown: f32 = 0,
 };
@@ -31,6 +35,9 @@ pub const Projectile = struct {
     velocity: Vec2,
     /// Distância que ainda pode voar.
     remaining: f32,
+    /// Vem da classe de quem atirou.
+    damage: u32,
+    radius: f32,
 };
 
 pub const World = struct {
@@ -41,6 +48,8 @@ pub const World = struct {
     ducks: std.MultiArrayList(Duck) = .empty,
     enemies: Pool(Enemy) = .{},
     projectiles: Pool(Projectile) = .{},
+    /// `(Segue, líder)` e `(Mira, inimigo)`.
+    relations: relations.Registry = .{},
     /// Eventos do passo atual; o `sim` limpa no começo de cada passo.
     events: std.ArrayList(Event) = .empty,
     /// Toda a aleatoriedade vem daqui, criada com a seed.
@@ -65,12 +74,13 @@ pub const World = struct {
         errdefer w.deinit(gpa);
 
         // Caminho reto atrás da líder, longo o bastante para a fila inicial.
-        const behind = start - vec.scale(heading, w.duckDistance(config.queue.start_ducks));
+        const start_classes = config.queue.start_classes;
+        const behind = start - vec.scale(heading, w.duckDistance(start_classes.len));
         try w.trail.push(gpa, behind);
         try w.trail.push(gpa, start);
 
-        for (0..config.queue.start_ducks) |i| {
-            try w.ducks.append(gpa, .{ .pos = w.trail.pointAt(w.duckDistance(i)) });
+        for (start_classes) |name| {
+            try w.addDuck(gpa, classes.find(config.classes, name) orelse return error.UnknownClass);
         }
         return w;
     }
@@ -81,6 +91,16 @@ pub const World = struct {
         self.enemies.deinit(gpa);
         self.projectiles.deinit(gpa);
         self.events.deinit(gpa);
+        self.relations.deinit(gpa);
+    }
+
+    /// Patinho novo no fim da fila, já seguindo a líder.
+    pub fn addDuck(self: *World, gpa: std.mem.Allocator, class: u32) !void {
+        const index = self.ducks.len;
+        try self.relations.items.ensureUnusedCapacity(gpa, 1);
+        try self.ducks.append(gpa, .{ .pos = self.trail.pointAt(self.duckDistance(index)), .class = class });
+        // Não falha: a capacidade já foi reservada (sem patinho sem relação em caso de erro).
+        self.relations.set(gpa, .segue, .{ .duck = @intCast(index) }, .leader) catch unreachable;
     }
 
     /// Resumo do estado da simulação. Dois mundos com o mesmo hash estão no
@@ -95,6 +115,12 @@ pub const World = struct {
         feed(&h, self.spawn_timer);
         for (self.ducks.items(.pos)) |p| feedVec(&h, p);
         h.update(std.mem.sliceAsBytes(self.ducks.items(.cooldown)));
+        h.update(std.mem.sliceAsBytes(self.ducks.items(.class)));
+        for (self.relations.items.items) |r| {
+            feed(&h, @backingInt(r.kind));
+            feedEntity(&h, r.source);
+            feedEntity(&h, r.target);
+        }
 
         const e = self.enemies.items;
         for (0..self.enemies.slots()) |i| {
@@ -109,6 +135,8 @@ pub const World = struct {
             feedVec(&h, p.items(.pos)[i]);
             feedVec(&h, p.items(.velocity)[i]);
             feed(&h, p.items(.remaining)[i]);
+            feed(&h, p.items(.damage)[i]);
+            feed(&h, p.items(.radius)[i]);
         }
         return h.final();
     }
@@ -120,6 +148,16 @@ pub const World = struct {
 
     fn feedVec(h: *std.hash.Wyhash, v: Vec2) void {
         feed(h, vec.toArray(v));
+    }
+
+    /// Campo a campo: uma union também tem bytes de preenchimento com lixo.
+    fn feedEntity(h: *std.hash.Wyhash, e: relations.Entity) void {
+        feed(h, @backingInt(std.meta.activeTag(e)));
+        switch (e) {
+            .leader => {},
+            .duck => |i| feed(h, i),
+            .enemy => |handle| feed(h, handle),
+        }
     }
 
     /// Distância ao longo do caminho até o patinho `index` (0 = o primeiro).
@@ -143,11 +181,39 @@ test "init: patinhos em fila atrás da líder, um espaçamento entre cada" {
     const cfg = config_example(); // líder em (400, 300) olhando para +x, espaçamento 26
     var w: World = try .init(std.testing.allocator, cfg);
     defer w.deinit(std.testing.allocator);
-    try std.testing.expectEqual(cfg.queue.start_ducks, w.ducks.len);
+    try std.testing.expectEqual(cfg.queue.start_classes.len, w.ducks.len);
     const pos = w.ducks.items(.pos);
     try expectVec(.{ 374, 300 }, pos[0]);
     try expectVec(.{ 348, 300 }, pos[1]);
     try expectVec(.{ 322, 300 }, pos[2]);
+}
+
+test "init: cada patinho com a classe da lista inicial, na ordem" {
+    var w: World = try .init(std.testing.allocator, config_example()); // arqueiro, arqueiro, mago
+    defer w.deinit(std.testing.allocator);
+    const want = [_]u32{ 0, 0, 1 };
+    try std.testing.expectEqualSlices(u32, &want, w.ducks.items(.class));
+}
+
+test "init e addDuck: todo patinho segue a líder; o novo entra no fim" {
+    const gpa = std.testing.allocator;
+    var w: World = try .init(gpa, config_example());
+    defer w.deinit(gpa);
+    try std.testing.expectEqual(w.ducks.len, w.relations.query(.segue, .{ .is = .leader }).count());
+    try w.addDuck(gpa, 1);
+    try std.testing.expectEqual(4, w.ducks.len);
+    try std.testing.expectEqual(1, w.ducks.items(.class)[3]);
+    try std.testing.expectEqual(relations.Entity.leader, w.relations.targetOf(.segue, .{ .duck = 3 }).?);
+}
+
+test "hash: muda com as relações" {
+    const gpa = std.testing.allocator;
+    var a: World = try .init(gpa, config_example());
+    defer a.deinit(gpa);
+    var b: World = try .init(gpa, config_example());
+    defer b.deinit(gpa);
+    try b.relations.set(gpa, .mira, .{ .duck = 0 }, .{ .enemy = .{ .index = 0, .generation = 0 } });
+    try std.testing.expect(a.hash() != b.hash());
 }
 
 test "init: vida da fila cheia, sem inimigos nem flechas, spawn esperando o intervalo" {
@@ -183,7 +249,7 @@ test "hash: muda com as flechas" {
     defer a.deinit(gpa);
     var b: World = try .init(gpa, config_example());
     defer b.deinit(gpa);
-    _ = try b.projectiles.add(gpa, .{ .pos = .{ 1, 2 }, .velocity = .{ 3, 4 }, .remaining = 5 });
+    _ = try b.projectiles.add(gpa, .{ .pos = .{ 1, 2 }, .velocity = .{ 3, 4 }, .remaining = 5, .damage = 1, .radius = 2 });
     try std.testing.expect(a.hash() != b.hash());
 }
 

@@ -1,0 +1,13 @@
+// Classes de exemplo para os testes (as do jogo ficam em data/classes.zon).
+.{
+    .{
+        .name = "arqueiro",
+        .look = .{ .hat = .hood, .accent = .green },
+        .attack = .{ .projectile = .{ .range = 200, .cooldown = 0.5, .damage = 1, .speed = 400, .radius = 4 } },
+    },
+    .{
+        .name = "mago",
+        .look = .{ .hat = .pointed, .accent = .blue },
+        .attack = .{ .area = .{ .radius = 60, .cooldown = 1, .damage = 2 } },
+    },
+}

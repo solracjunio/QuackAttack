@@ -1,0 +1,27 @@
+// Classes de patinho. Lidas quando o jogo abre: mudar aqui não exige recompilar.
+// Uma classe nova que usa um ataque que já existe (projectile, area) é só uma
+// entrada nova aqui. Aparência: ver docs/guia-visual.md ("Patos").
+.{
+    .{
+        .name = "arqueiro",
+        .look = .{ .hat = .hood, .accent = .green },
+        // Atira no alvo que estiver mirando.
+        .attack = .{ .projectile = .{
+            .range = 230,
+            .cooldown = 0.7,
+            .damage = 1,
+            .speed = 420,
+            .radius = 4,
+        } },
+    },
+    .{
+        .name = "mago",
+        .look = .{ .hat = .pointed, .accent = .blue },
+        // Dano em todos os inimigos em volta de si.
+        .attack = .{ .area = .{
+            .radius = 80,
+            .cooldown = 1.6,
+            .damage = 2,
+        } },
+    },
+}

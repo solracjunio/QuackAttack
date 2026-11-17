@@ -7,7 +7,8 @@ const Event = game.events.Event;
 const debug = @import("ui/debug.zig");
 const Renderer = @import("ui/render.zig").Renderer;
 
-const data_path = "data/game.zon";
+const game_path = "data/game.zon";
+const classes_path = "data/classes.zon";
 
 /// Passo de frame mais longo que a simulação aceita, em segundos. Evita uma
 /// avalanche de passos depois de uma pausa (janela arrastada, depurador).
@@ -50,20 +51,28 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-/// Lê e valida `data/game.zon`. Em erro, explica no terminal e encerra.
+/// Lê `data/game.zon` e `data/classes.zon` e valida os dois juntos.
+/// Em erro, explica no terminal e encerra.
 fn loadConfig(init: std.process.Init) !game.config.Config {
     const arena = init.arena.allocator();
-    const text = try std.Io.Dir.cwd().readFileAllocOptions(init.io, data_path, arena, .unlimited, .of(u8), 0);
     var diag: std.zon.parse.Diagnostics = undefined;
-    const config = game.config.parse(arena, text, &diag) catch |err| {
-        diag.log(data_path);
+    var config = game.config.parse(arena, try readData(init, game_path), &diag) catch |err| {
+        diag.log(game_path);
+        return err;
+    };
+    config.classes = game.classes.parse(arena, try readData(init, classes_path), &diag) catch |err| {
+        diag.log(classes_path);
         return err;
     };
     if (game.config.validate(config)) |problem| {
-        std.log.err("{s}: {s}", .{ data_path, problem });
+        std.log.err("data/: {s}", .{problem});
         return error.InvalidData;
     }
     return config;
+}
+
+fn readData(init: std.process.Init, path: []const u8) ![:0]const u8 {
+    return std.Io.Dir.cwd().readFileAllocOptions(init.io, path, init.arena.allocator(), .unlimited, .of(u8), 0);
 }
 
 /// -1, 0 ou 1. Com y para baixo na tela, girar positivo é girar no sentido horário.
