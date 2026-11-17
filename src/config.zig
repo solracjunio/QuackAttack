@@ -4,6 +4,8 @@ const vec = @import("vec.zig");
 const Vec2 = vec.Vec2;
 
 pub const Config = struct {
+    /// Mesma seed, mesma partida (pilar Depurável).
+    seed: u64,
     /// Passos de simulação por segundo (passo fixo).
     ticks_per_second: u32,
     /// Área de jogo; a líder é refletida nas bordas.
@@ -22,6 +24,32 @@ pub const Config = struct {
         start_ducks: u32,
         /// Distância entre patinhos, medida ao longo do caminho da líder.
         spacing: f32,
+        radius: f32,
+        /// Vida da fila inteira (uma só para todos).
+        life: u32,
+        /// Segundos sem levar dano de contato depois de um contato.
+        invulnerable_time: f32,
+    },
+    enemy: struct {
+        radius: f32,
+        speed: f32,
+        life: u32,
+        /// Dano na fila quando encosta nela.
+        contact_damage: u32,
+    },
+    spawner: struct {
+        /// Segundos entre um inimigo e o próximo.
+        interval: f32,
+    },
+    archer: struct {
+        /// Distância máxima do alvo e do voo da flecha.
+        range: f32,
+        /// Segundos entre um tiro e o próximo.
+        cooldown: f32,
+        damage: u32,
+    },
+    projectile: struct {
+        speed: f32,
         radius: f32,
     },
 };
@@ -46,6 +74,18 @@ pub fn validate(c: Config) ?[]const u8 {
         .{ insideWorld(c, l.start, l.radius), "leader.start precisa ficar dentro do mundo, contando o raio" },
         .{ c.queue.spacing > 0, "queue.spacing precisa ser maior que 0" },
         .{ c.queue.radius > 0, "queue.radius precisa ser maior que 0" },
+        .{ c.queue.life > 0, "queue.life precisa ser maior que 0" },
+        .{ c.queue.invulnerable_time >= 0, "queue.invulnerable_time não pode ser negativo" },
+        .{ c.enemy.radius > 0, "enemy.radius precisa ser maior que 0" },
+        .{ c.enemy.speed > 0, "enemy.speed precisa ser maior que 0" },
+        .{ c.enemy.life > 0, "enemy.life precisa ser maior que 0" },
+        .{ c.enemy.contact_damage > 0, "enemy.contact_damage precisa ser maior que 0" },
+        .{ c.spawner.interval > 0, "spawner.interval precisa ser maior que 0" },
+        .{ c.archer.range > 0, "archer.range precisa ser maior que 0" },
+        .{ c.archer.cooldown > 0, "archer.cooldown precisa ser maior que 0" },
+        .{ c.archer.damage > 0, "archer.damage precisa ser maior que 0" },
+        .{ c.projectile.speed > 0, "projectile.speed precisa ser maior que 0" },
+        .{ c.projectile.radius > 0, "projectile.radius precisa ser maior que 0" },
     };
     for (checks) |check| {
         if (!check[0]) return check[1];
@@ -69,10 +109,15 @@ pub fn example() Config {
 
 const sample =
     \\.{
+    \\    .seed = 42,
     \\    .ticks_per_second = 60,
     \\    .world = .{ .width = 800, .height = 600 },
     \\    .leader = .{ .start = .{ 400, 300 }, .start_heading = .{ 1, 0 }, .speed = 150, .turn_speed = 3, .radius = 12 },
-    \\    .queue = .{ .start_ducks = 3, .spacing = 26, .radius = 10 },
+    \\    .queue = .{ .start_ducks = 3, .spacing = 26, .radius = 10, .life = 10, .invulnerable_time = 1 },
+    \\    .enemy = .{ .radius = 10, .speed = 60, .life = 3, .contact_damage = 2 },
+    \\    .spawner = .{ .interval = 2 },
+    \\    .archer = .{ .range = 200, .cooldown = 0.5, .damage = 1 },
+    \\    .projectile = .{ .speed = 400, .radius = 4 },
     \\}
 ;
 
@@ -85,6 +130,8 @@ test "parse: lê o ZON da configuração" {
     try std.testing.expectEqual(800, c.world.width);
     try std.testing.expectEqual(300, c.leader.start[1]);
     try std.testing.expectEqual(3, c.queue.start_ducks);
+    try std.testing.expectEqual(42, c.seed);
+    try std.testing.expectEqual(400, c.projectile.speed);
 }
 
 test "parse: campo faltando é erro" {
@@ -124,6 +171,48 @@ test "validate: recusa valores que quebram o jogo" {
     c = base;
     c.queue.radius = 0;
     try std.testing.expect(validate(c) != null);
+    c = base;
+    c.queue.life = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.queue.invulnerable_time = -1;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.enemy.radius = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.enemy.speed = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.enemy.life = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.enemy.contact_damage = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.spawner.interval = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.archer.range = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.archer.cooldown = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.archer.damage = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.projectile.speed = 0;
+    try std.testing.expect(validate(c) != null);
+    c = base;
+    c.projectile.radius = 0;
+    try std.testing.expect(validate(c) != null);
+}
+
+test "validate: invulnerable_time 0 é válido (sem invulnerabilidade)" {
+    var c = example();
+    c.queue.invulnerable_time = 0;
+    try std.testing.expectEqual(null, validate(c));
 }
 
 test "validate: turn_speed 0 é válido (a líder só não vira)" {

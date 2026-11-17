@@ -1,6 +1,8 @@
 // Números de balanceamento do QuackAttack. Lidos quando o jogo abre:
 // mudar aqui não exige recompilar.
 .{
+    // Mesma seed, mesma partida.
+    .seed = 2026,
     .ticks_per_second = 60,
     .world = .{ .width = 960, .height = 540 },
     .leader = .{
@@ -14,5 +16,20 @@
         .start_ducks = 4,
         .spacing = 30,
         .radius = 11,
+        .life = 10,
+        .invulnerable_time = 1.0,
     },
+    .enemy = .{
+        .radius = 12,
+        .speed = 70,
+        .life = 3,
+        .contact_damage = 1,
+    },
+    .spawner = .{ .interval = 1.2 },
+    .archer = .{
+        .range = 230,
+        .cooldown = 0.7,
+        .damage = 1,
+    },
+    .projectile = .{ .speed = 420, .radius = 4 },
 }
