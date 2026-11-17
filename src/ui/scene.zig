@@ -6,6 +6,7 @@ const World = game.world.World;
 const Vec2 = game.vec.Vec2;
 const vec = game.vec;
 const palette = @import("palette.zig");
+const classes = game.classes;
 
 /// A cena é desenhada com 1/`pixel_scale` da resolução da janela e ampliada.
 pub const pixel_scale = 2;
@@ -37,6 +38,16 @@ const duck_eye_size = 0.16;
 const hat_height = 0.9;
 const hat_width = 0.55;
 const hat_base = 0.65;
+// Chapéu de mago: mais alto, com aba.
+const wizard_height = 1.3;
+const wizard_width = 0.5;
+const brim_width = 0.85;
+const brim_height = 0.18;
+// Anel do feitiço em área: aparece logo depois do lançamento e some.
+const spell_flash_seconds = 0.35;
+const spell_ring_thick = 4;
+const spell_ring_alpha = 0.55;
+const ring_segments = 48;
 // Flecha.
 const arrow_back = 14;
 const arrow_thick = 4;
@@ -54,6 +65,7 @@ pub fn drawGround(w: World) void {
 /// Camada dos atores: inimigos, flechas e a fila. Fica por cima do brilho,
 /// para o contorno continuar nítido.
 pub fn drawActors(w: World) void {
+    drawSpells(w);
     drawEnemies(w);
     drawArrows(w);
     drawQueue(w);
@@ -145,8 +157,9 @@ fn drawQueue(w: World) void {
         // Cada filhote olha para o pato da frente.
         const ahead = if (i == 0) w.leader.pos else ducks[i - 1];
         const facing = facingTo(ducks[i], ahead, w.leader.heading);
+        const class = cfg.classes[w.ducks.items(.class)[i]];
         duck(ducks[i], facing, cfg.queue.radius, palette.duckling, fade);
-        hood(ducks[i], cfg.queue.radius, fade);
+        hat(ducks[i], cfg.queue.radius, class.look, fade);
     }
     duck(w.leader.pos, w.leader.heading, cfg.leader.radius, palette.leader, fade);
 }
@@ -178,15 +191,57 @@ fn duck(pos: Vec2, facing: Vec2, r: f32, body: rl.Color, fade: f32) void {
     rl.drawCircleV(toRl(eye), r * duck_eye_size, palette.ink.fade(fade));
 }
 
-/// Capuz pontudo do arqueiro, no alto da cabeça.
-fn hood(pos: Vec2, r: f32, fade: f32) void {
+/// Cor de destaque da classe na paleta.
+fn accentColor(accent: classes.Accent) rl.Color {
+    return switch (accent) {
+        .green => palette.archer,
+        .blue => palette.mage,
+    };
+}
+
+/// Acessório da classe no alto da cabeça (guia visual: classe = acessório).
+fn hat(pos: Vec2, r: f32, look: classes.Look, fade: f32) void {
+    const color = accentColor(look.accent).fade(fade);
     const base_y = pos[1] - r * hat_base;
-    triangle(
-        .{ pos[0], base_y - r * hat_height },
-        .{ pos[0] - r * hat_width, base_y },
-        .{ pos[0] + r * hat_width, base_y },
-        palette.archer.fade(fade),
-    );
+    switch (look.hat) {
+        .hood => triangle(
+            .{ pos[0], base_y - r * hat_height },
+            .{ pos[0] - r * hat_width, base_y },
+            .{ pos[0] + r * hat_width, base_y },
+            color,
+        ),
+        .pointed => {
+            rl.drawRectangleV(
+                .{ .x = pos[0] - r * brim_width, .y = base_y - r * brim_height },
+                .{ .x = r * brim_width * 2, .y = r * brim_height * 2 },
+                color,
+            );
+            triangle(
+                .{ pos[0] + r * wizard_width * 0.5, base_y - r * wizard_height },
+                .{ pos[0] - r * wizard_width, base_y },
+                .{ pos[0] + r * wizard_width, base_y },
+                color,
+            );
+        },
+    }
+}
+
+/// Anel do feitiço em área, logo depois do lançamento (a recarga acabou de recomeçar).
+fn drawSpells(w: World) void {
+    const ducks = w.ducks.slice();
+    for (ducks.items(.pos), ducks.items(.cooldown), ducks.items(.class)) |pos, cooldown, class_index| {
+        const class = w.config.classes[class_index];
+        const spell = switch (class.attack) {
+            .area => |a| a,
+            else => continue,
+        };
+        const since_cast = spell.cooldown - cooldown;
+        if (cooldown == 0 or since_cast > spell_flash_seconds) continue;
+        const fade = (1 - since_cast / spell_flash_seconds) * spell_ring_alpha;
+        const color = accentColor(class.look.accent);
+        rl.drawCircleV(toRl(pos), spell.radius, color.fade(fade * 0.35));
+        rl.drawRing(toRl(pos), spell.radius - spell_ring_thick, spell.radius, 0, 360, ring_segments, color.fade(fade));
+    }
 }
 
 /// `drawTriangle` só desenha na ordem anti-horária da raylib (com y para

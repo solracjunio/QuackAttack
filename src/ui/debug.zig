@@ -19,12 +19,14 @@ pub fn draw(w: World, frame_events: []const Event) void {
     var lines: usize = 0;
     // Tipo explícito: com uma constante, o `@min` devolve um inteiro estreito (u5) que estoura na conta abaixo.
     const shown: usize = @min(frame_events.len, max_event_lines);
-    const height = (4 + shown) * line_height;
+    const height = (5 + shown) * line_height;
     rl.drawRectangle(x - 4, top - 4, panel_width, @intCast(height + 8), panel);
 
     var buf: [128]u8 = undefined;
     line(&lines, &buf, "FPS {d}", .{rl.getFPS()});
     line(&lines, &buf, "patinhos {d}  inimigos {d}  flechas {d}", .{ w.ducks.len, w.enemies.count, w.projectiles.count });
+    // (Mira, *): todos os patinhos que estão mirando em alguém.
+    line(&lines, &buf, "mirando {d}  seguindo a líder {d}", .{ w.relations.query(.mira, .any).count(), w.relations.query(.segue, .{ .is = .leader }).count() });
     line(&lines, &buf, "invulnerável {d:.2}s  próximo inimigo {d:.2}s", .{ w.invulnerable, w.spawn_timer });
     line(&lines, &buf, "eventos no frame: {d}", .{frame_events.len});
     for (frame_events[0..shown]) |e| {
