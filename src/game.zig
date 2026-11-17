@@ -23,6 +23,7 @@ pub const projeteis = @import("systems/projeteis.zig");
 pub const contato = @import("systems/contato.zig");
 pub const aplicar_dano = @import("systems/aplicar_dano.zig");
 pub const limpar_mortos = @import("systems/limpar_mortos.zig");
+pub const ondas = @import("systems/ondas.zig");
 pub const testing = @import("testing.zig");
 
 /// Faz o compilador analisar todas as declarações públicas, também dentro

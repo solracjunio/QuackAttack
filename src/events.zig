@@ -12,6 +12,10 @@ pub const Target = union(enum) {
 pub const Event = union(enum) {
     damage: struct { target: Target, amount: u32 },
     died: struct { enemy: Handle },
+    /// `wave` é o número da onda que acabou (1 = a primeira).
+    wave_ended: struct { wave: u32 },
+    /// Patinho novo no fim da fila: posição dele e índice da classe.
+    duck_joined: struct { duck: u32, class: u32 },
 };
 
 /// Texto do evento para o overlay de debug. O `switch` é exaustivo: um tipo
@@ -29,6 +33,8 @@ fn write(e: Event, w: *std.Io.Writer) std.Io.Writer.Error!void {
             .enemy => |h| try w.print("dano {d} no inimigo #{d}.{d}", .{ d.amount, h.index, h.generation }),
         },
         .died => |d| try w.print("morreu inimigo #{d}.{d}", .{ d.enemy.index, d.enemy.generation }),
+        .wave_ended => |d| try w.print("fim da onda {d}", .{d.wave}),
+        .duck_joined => |d| try w.print("patinho {d} entrou (classe {d})", .{ d.duck, d.class }),
     }
 }
 
@@ -38,6 +44,12 @@ test "describe: texto de cada tipo de evento" {
     try std.testing.expectEqualStrings("dano 3 na fila", describe(.{ .damage = .{ .target = .queue, .amount = 3 } }, &buf));
     try std.testing.expectEqualStrings("dano 1 no inimigo #4.2", describe(.{ .damage = .{ .target = .{ .enemy = h }, .amount = 1 } }, &buf));
     try std.testing.expectEqualStrings("morreu inimigo #4.2", describe(.{ .died = .{ .enemy = h } }, &buf));
+}
+
+test "describe: fim de onda e patinho novo" {
+    var buf: [64]u8 = undefined;
+    try std.testing.expectEqualStrings("fim da onda 3", describe(.{ .wave_ended = .{ .wave = 3 } }, &buf));
+    try std.testing.expectEqualStrings("patinho 5 entrou (classe 1)", describe(.{ .duck_joined = .{ .duck = 5, .class = 1 } }, &buf));
 }
 
 test "describe: buffer pequeno corta o texto em vez de falhar" {
