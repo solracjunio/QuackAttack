@@ -70,8 +70,10 @@ nada de cor solta no código de desenho.
   filhote olha para o pato da frente.
 - **Olho:** um ponto escuro (`ink`), do lado do bico.
 - **Classe = acessório na cabeça**, sempre com cor própria e forma simples:
-  - arqueiro: capuz pontudo verde (`archer`);
-  - mago (próxima fase): chapéu pontudo azul (`mage`).
+  - arqueiro: capuz pontudo verde (`archer`), `hat = .hood`;
+  - mago: chapéu de mago azul (`mage`), mais alto e com aba, `hat = .pointed`.
+  O acessório e a cor vêm do `data/classes.zon` (`look`); a interface só
+  traduz `accent` para a cor da paleta.
   Classe nova ganha um acessório novo, de silhueta diferente das outras.
 - **Invulnerável:** a fila inteira pisca (fica translúcida em intervalos).
 
@@ -89,8 +91,10 @@ nada de cor solta no código de desenho.
 ## Projéteis
 
 - **Flecha:** traço curto e grosso branco (`arrow`) com ponta em triângulo,
-  alinhada com a direção do voo. Ataques de área (mago) usarão a cor da classe
-  com transparência.
+  alinhada com a direção do voo.
+- **Ataque em área:** logo depois do lançamento, um disco translúcido e um
+  anel na cor da classe mostram o raio, e somem em ~0,35 s. Fica na camada dos
+  atores (brilha).
 
 ## HUD
 
@@ -121,7 +125,7 @@ nada de cor solta no código de desenho.
 | `duckling` | `#FFD447` | corpo dos filhotes |
 | `beak` | `#FF8A3D` | bicos |
 | `archer` | `#3ECF8E` | capuz do arqueiro |
-| `mage` | `#5B8CFF` | chapéu do mago (próxima fase) |
+| `mage` | `#5B8CFF` | chapéu e feitiço do mago |
 | `enemy_coral` | `#FF4F78` | inimigo básico |
 | `highlight` | `#FFFFFF` a 45% | brilho nos corpos |
 | `bar_back` | `#16161A` | fundo das barras de vida |

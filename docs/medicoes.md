@@ -87,6 +87,39 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 - **E enchia o disco:** cada mutante era compilado no cache principal do Zig, e as saídas ficavam para sempre (18 GB depois de algumas execuções). Agora os mutantes usam um cache próprio na pasta de trabalho, apagado no fim (o cache ficou em ~240 MB).
 - **Floats em teste:** `1.9 + 0.1` em `f32` não fecha em `2`, e o spawner "atrasava" um passo. O código estava certo; o teste passou a usar valores exatos em binário.
 
+## Fase 3: Dados e classes
+
+| Medição | Valor |
+|---|---|
+| Tempo gasto | ~30 min |
+| API de Zig de outra versão escrita pelo Claude | 0 |
+| Testes da lógica | 111, mais 1 do `data/check.zig` (eram 83) |
+| Bugs pegos pelos testes | 0 |
+| Mutantes sobreviventes no primeiro `quality` completo | 1 → 0 |
+| **Arquivos tocados pelo mago** (pilar: no máximo 2) | **7** (ver abaixo) |
+
+### O mago e o pilar "classe nova toca no máximo 2 arquivos"
+
+O mago tocou 7 arquivos, porque trouxe **comportamento novo** (ataque em área) e **acessório novo** (chapéu de mago):
+
+1. `data/classes.zon`: a entrada do mago;
+2. `src/example_classes.zon`: o mago de exemplo dos testes;
+3. `src/classes.zig`: a variante `area` do `Attack` e as regras dela no `validate`;
+4. `src/systems/magia.zig`: o sistema novo;
+5. `src/sim.zig`: chamar o sistema no passo;
+6. `src/game.zig`: expor o sistema para os testes rodarem;
+7. `src/ui/scene.zig`: o chapéu de mago e o anel do feitiço.
+
+Já uma classe que **reaproveita** um ataque e um acessório (por exemplo, um "besteiro" com mais alcance e menos cadência) toca **1 arquivo**: o `data/classes.zon`. O pilar vale para variações de classe, mas não para comportamento novo: em Zig, sem registro dinâmico de sistemas, cada comportamento novo precisa ser ligado no `sim.zig` e exposto no `game.zig`.
+
+### Notas para o post
+
+- **Relacionamentos com curinga** ficaram pequenos (`src/relations.zig`, uma lista de `(tipo, fonte, alvo)`). O `seguir` consulta `(Segue, líder)`; o `mirar` mantém `(Mira, inimigo)`; o `limpar_mortos` usa a consulta por alvo para achar quem mirava no morto; o overlay mostra `query(.mira, .any)`. A geração do handle vale também nas relações: um inimigo novo na vaga do antigo não herda os atiradores.
+- **Mirar separado de atacar:** com o alvo guardado como relação, o arqueiro passou a manter o alvo enquanto ele está no alcance, em vez de trocar a cada tiro. Escolher o alvo (`mirar`) e atirar (`atacar`) viraram dois sistemas que não se conhecem.
+- **Union também tem lixo no preenchimento:** a mesma lição do `@Vector` na fase 2. A entidade `.leader` não tem conteúdo, e os bytes do conteúdo ficam com lixo; no hash, a entidade entra campo a campo.
+- **Fixtures em `.zon`:** as classes de exemplo dos testes ficaram num `.zon` dentro de `src/`. O `analyze` não conta números de `.zon`, e o Zig importa o arquivo com o tipo certo em tempo de compilação. Mas o `mutate` só copiava `.zig`, e a linha de base passou a falhar; agora ele copia tudo.
+- **Números mágicos em helpers de teste de novo:** 22, todos de posições de teste em helpers fora dos blocos `test`. A regra já estava no `CLAUDE.md`; o conserto foi passar as posições como argumento.
+
 <!-- quality:begin (gerado pelo zig build quality; não editar à mão) -->
 ## Qualidade (`zig build quality`)
 
@@ -109,41 +142,45 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 
 | Medição | Valor | Regra |
 |---|---|---|
-| Cobertura (linhas) | 🟢 100.0% (386/386) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
-| Mutação | ✅ 0 sobrevivente(s); 110 morto(s), 1 por tempo esgotado, 42 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
-| Complexidade (maior) | 🟢 6 (`Pool`, `pool.zig:8`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
+| Cobertura (linhas) | 🟢 100.0% (546/546) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
+| Mutação | ✅ 0 sobrevivente(s); 141 morto(s), 1 por tempo esgotado, 75 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
+| Complexidade (maior) | 🟢 7 (`hash`, `world.zig:108`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
 
 ### Cobertura por arquivo
 
 | Arquivo | Linhas | Cobertura |
 |---|---|---|
 | `testing.zig` | 5/5 | 🟢 100.0% |
-| `config.zig` | 36/36 | 🟢 100.0% |
+| `config.zig` | 41/41 | 🟢 100.0% |
+| `classes.zig` | 28/28 | 🟢 100.0% |
 | `events.zig` | 10/10 | 🟢 100.0% |
-| `sim.zig` | 11/11 | 🟢 100.0% |
-| `world.zig` | 55/55 | 🟢 100.0% |
-| `game.zig` | 4/4 | 🟢 100.0% |
+| `sim.zig` | 13/13 | 🟢 100.0% |
+| `systems/mover.zig` | 21/21 | 🟢 100.0% |
+| `trail.zig` | 28/28 | 🟢 100.0% |
+| `systems/seguir.zig` | 8/8 | 🟢 100.0% |
+| `systems/spawner.zig` | 17/17 | 🟢 100.0% |
+| `world.zig` | 75/75 | 🟢 100.0% |
+| `game.zig` | 5/5 | 🟢 100.0% |
 | `systems/aplicar_dano.zig` | 26/26 | 🟢 100.0% |
 | `systems/perseguir.zig` | 17/17 | 🟢 100.0% |
 | `health.zig` | 8/8 | 🟢 100.0% |
 | `vec.zig` | 12/12 | 🟢 100.0% |
-| `systems/limpar_mortos.zig` | 4/4 | 🟢 100.0% |
-| `systems/mover.zig` | 21/21 | 🟢 100.0% |
-| `trail.zig` | 28/28 | 🟢 100.0% |
+| `systems/limpar_mortos.zig` | 5/5 | 🟢 100.0% |
+| `relations.zig` | 45/45 | 🟢 100.0% |
 | `pool.zig` | 43/43 | 🟢 100.0% |
-| `systems/projeteis.zig` | 25/25 | 🟢 100.0% |
+| `systems/atacar.zig` | 30/30 | 🟢 100.0% |
 | `systems/contato.zig` | 27/27 | 🟢 100.0% |
-| `systems/atacar.zig` | 32/32 | 🟢 100.0% |
-| `systems/spawner.zig` | 17/17 | 🟢 100.0% |
-| `systems/seguir.zig` | 5/5 | 🟢 100.0% |
+| `systems/magia.zig` | 23/23 | 🟢 100.0% |
+| `systems/projeteis.zig` | 24/24 | 🟢 100.0% |
+| `systems/mirar.zig` | 35/35 | 🟢 100.0% |
 
 ### Funções mais complexas
 
 | Função | Onde | Complexidade |
 |---|---|---|
+| `hash` | `world.zig:108` | 🟢 7 |
 | `Pool` | `pool.zig:8` | 🟢 6 |
 | `update` | `systems/aplicar_dano.zig:7` | 🟢 6 |
+| `update` | `systems/atacar.zig:11` | 🟢 6 |
 | `anyContact` | `systems/contato.zig:15` | 🟢 6 |
-| `hash` | `world.zig:88` | 🟢 6 |
-| `write` | `events.zig:25` | 🟢 5 |
 <!-- quality:end -->
