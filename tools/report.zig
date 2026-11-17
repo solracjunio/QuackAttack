@@ -365,8 +365,9 @@ fn renderPillars(w: *std.Io.Writer, in: Inputs) !void {
     try w.print("| Editável | Números mágicos em `src/` | {s} {d} | 🟢 0 · 🟡 1–5 · 🔴 > 5 |\n", .{ magicLight(a.magic.len).emoji(), a.magic.len });
     // O build só roda o relatório depois que o `data/check.zig` passou.
     try w.writeAll("| Editável | Dados válidos | ✅ `data/check.zig` passou | Reprova se falhar |\n");
-    try w.writeAll("| Depurável | Determinismo (mesma seed, mesmo hash) | ⏳ ainda não há mundo (fase 2) | Reprova se diferir |\n");
-    try w.writeAll("| Depurável | Todo evento aparece no debug | ⏳ ainda não há eventos (fase 2) | Reprova no build |\n");
+    // O teste de determinismo (`sim.zig`) roda junto com os testes da mutação: se falhar, a linha de base falha.
+    try w.print("| Depurável | Determinismo (mesma seed, mesmo hash) | {s} teste de `sim.zig` | Reprova se diferir |\n", .{pass(in.mutation.baseline_ok)});
+    try w.writeAll("| Depurável | Todo evento aparece no debug | ✅ `switch` exaustivo em `events.describe` | Reprova no build |\n");
     const f = in.fixes;
     if (f.fixes == 0) {
         try w.writeAll("| Depurável | Commits `fix:` com teste | 🟢 nenhum commit `fix:` ainda | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |\n\n");
@@ -481,6 +482,8 @@ test "render: mostra resultado, cobertura com semáforo e sobreviventes" {
     try std.testing.expect(std.mem.indexOf(u8, ok, "✅ passou") != null);
     try std.testing.expect(std.mem.indexOf(u8, ok, "🟢 90.0% (9/10)") != null);
     try std.testing.expect(std.mem.indexOf(u8, ok, "🟡 12") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ok, "| Depurável | Determinismo (mesma seed, mesmo hash) | ✅") != null);
+    try std.testing.expect(std.mem.indexOf(u8, ok, "| Depurável | Todo evento aparece no debug | ✅") != null);
 
     in.mutation.survivors = &.{.{ .path = "health.zig", .line = 18, .column = 22, .description = "`-|=` → `+|=`" }};
     const bad = try render(a, in);
