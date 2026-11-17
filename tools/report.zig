@@ -363,7 +363,8 @@ fn renderPillars(w: *std.Io.Writer, in: Inputs) !void {
     try w.print("| Modular | Ciclos de imports | {s} {s} | Reprova se houver |\n", .{ pass(a.cycle == null), if (a.cycle == null) "nenhum" else "há ciclo" });
     try w.print("| Modular | Lógica testável sem engine | {s} testes rodam sem a raylib | Reprova se não compilar |\n", .{pass(in.mutation.baseline_ok)});
     try w.print("| Editável | Números mágicos em `src/` | {s} {d} | 🟢 0 · 🟡 1–5 · 🔴 > 5 |\n", .{ magicLight(a.magic.len).emoji(), a.magic.len });
-    try w.writeAll("| Editável | Dados válidos | ⏳ ainda não há `data/*.zon` (fase 3) | Reprova se falhar |\n");
+    // O build só roda o relatório depois que o `data/check.zig` passou.
+    try w.writeAll("| Editável | Dados válidos | ✅ `data/check.zig` passou | Reprova se falhar |\n");
     try w.writeAll("| Depurável | Determinismo (mesma seed, mesmo hash) | ⏳ ainda não há mundo (fase 2) | Reprova se diferir |\n");
     try w.writeAll("| Depurável | Todo evento aparece no debug | ⏳ ainda não há eventos (fase 2) | Reprova no build |\n");
     const f = in.fixes;
@@ -408,7 +409,7 @@ fn renderDetails(arena: std.mem.Allocator, w: *std.Io.Writer, in: Inputs) !void 
     const m = in.mutation;
     if (m.survivors.len > 0) {
         try w.writeAll("### Mutantes sobreviventes\n\nCada um precisa de um teste que o mate, ou de `// mutation: disable — <motivo>`.\n\n");
-        for (m.survivors) |s| try w.print("- `{s}:{d}`: {s}\n", .{ s.path, s.line, s.description });
+        for (m.survivors) |s| try w.print("- `{s}:{d}:{d}`: {s}\n", .{ s.path, s.line, s.column, s.description });
         try w.writeAll("\n");
     }
     for (m.missing_reason) |p| try w.print("- `{s}:{d}`: `// mutation: disable` sem motivo\n", .{ p.path, p.line });
@@ -481,8 +482,8 @@ test "render: mostra resultado, cobertura com semáforo e sobreviventes" {
     try std.testing.expect(std.mem.indexOf(u8, ok, "🟢 90.0% (9/10)") != null);
     try std.testing.expect(std.mem.indexOf(u8, ok, "🟡 12") != null);
 
-    in.mutation.survivors = &.{.{ .path = "health.zig", .line = 18, .description = "`-|=` → `+|=`" }};
+    in.mutation.survivors = &.{.{ .path = "health.zig", .line = 18, .column = 22, .description = "`-|=` → `+|=`" }};
     const bad = try render(a, in);
     try std.testing.expect(std.mem.indexOf(u8, bad, "❌ reprovou") != null);
-    try std.testing.expect(std.mem.indexOf(u8, bad, "`health.zig:18`") != null);
+    try std.testing.expect(std.mem.indexOf(u8, bad, "`health.zig:18:22`") != null);
 }

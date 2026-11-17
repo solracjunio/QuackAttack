@@ -190,14 +190,21 @@ test "findCycle: null quando dois arquivos importam o mesmo (diamante não é ci
 
 pub const Magic = struct { line: u32, text: []const u8 };
 
-/// Literais numéricos fora de blocos `test`, exceto 0 e 1.
+/// Comentário que libera números na linha dele e na de baixo.
+const magic_allow_marker = "// magic: allow";
+
+/// Literais numéricos fora de blocos `test`, exceto 0 e 1 e as linhas
+/// liberadas por `// magic: allow — <motivo>`.
 pub fn magicNumbers(gpa: std.mem.Allocator, p: Parsed) ![]Magic {
     const allowed = [_][]const u8{ "0", "1", "0.0", "1.0" };
+    const allows = try source.directives(gpa, p.tree.source, magic_allow_marker);
+    defer gpa.free(allows);
     var list: std.ArrayList(Magic) = .empty;
     errdefer list.deinit(gpa);
     var t: Ast.TokenIndex = 0;
     next: while (t < p.tree.tokens.len) : (t += 1) {
         if (p.tree.tokenTag(t) != .number_literal or p.inTest(t)) continue;
+        if (source.isCovered(allows, p.line(t))) continue;
         const text = p.tree.tokenSlice(t);
         for (allowed) |a| {
             if (std.mem.eql(u8, text, a)) continue :next;
@@ -275,6 +282,22 @@ fn countBranches(tree: Ast, first: Ast.TokenIndex, last: Ast.TokenIndex) u32 {
 
 fn byLine(_: void, a: FnComplexity, b: FnComplexity) bool {
     return a.line < b.line;
+}
+
+test "magicNumbers: `// magic: allow — <motivo>` libera a linha dele e a de baixo" {
+    const gpa = std.testing.allocator;
+    var p: Parsed = try .init(gpa,
+        \\pub const Vec2 = @Vector(2, f32); // magic: allow — dimensão do vetor
+        \\// magic: allow — tolerância de comparação
+        \\const eps = 1e-3;
+        \\// magic: allow
+        \\const sem_motivo = 7;
+    );
+    defer p.deinit(gpa);
+    const found = try magicNumbers(gpa, p);
+    defer gpa.free(found);
+    try std.testing.expectEqual(1, found.len);
+    try std.testing.expectEqualStrings("7", found[0].text);
 }
 
 test "complexity: conta 1 mais cada desvio, por função" {

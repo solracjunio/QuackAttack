@@ -7,7 +7,7 @@ const source = @import("source.zig");
 const Parsed = source.Parsed;
 
 pub const Report = struct {
-    pub const Survivor = struct { path: []const u8, line: u32, description: []const u8 };
+    pub const Survivor = struct { path: []const u8, line: u32, column: u32 = 0, description: []const u8 };
     pub const Place = struct { path: []const u8, line: u32 };
 
     /// Os testes passam sem mutação? Se não, nada mais foi medido.
@@ -75,7 +75,7 @@ const Runner = struct {
                     .killed => report.killed += 1,
                     .timeout => report.timeout += 1,
                     .no_compile => report.no_compile += 1,
-                    .survived => try survivors.append(self.arena, .{ .path = f.path, .line = m.line, .description = m.description }),
+                    .survived => try survivors.append(self.arena, .{ .path = f.path, .line = m.line, .column = m.column, .description = m.description }),
                 }
             }
             try self.write(f.path, f.source);
@@ -107,6 +107,7 @@ pub const Mutant = struct {
     end: u32,
     replacement: []const u8,
     line: u32,
+    column: u32 = 0,
     /// Ex.: "`<` → `<=`".
     description: []const u8,
 };
@@ -131,6 +132,7 @@ pub fn mutants(gpa: std.mem.Allocator, p: Parsed) ![]Mutant {
             .end = start + @as(u32, @intCast(text.len)),
             .replacement = swap,
             .line = p.line(t),
+            .column = p.column(t),
             .description = try std.fmt.allocPrint(gpa, "`{s}` → `{s}`", .{ text, swap }),
         });
     }
@@ -155,6 +157,7 @@ fn deleteReturn(gpa: std.mem.Allocator, p: Parsed, ret: Ast.TokenIndex) !Mutant 
         .end = tree.tokenStart(t) + 1,
         .replacement = "{}",
         .line = p.line(ret),
+        .column = p.column(ret),
         .description = try gpa.dupe(u8, "apaga o `return`"),
     };
 }
@@ -216,6 +219,22 @@ test "mutants: troca comparação, soma e booleano" {
     try expectMutations("const a = true;", &.{"const a = false;"});
 }
 
+test "mutants: guarda linha e coluna, para separar mutantes da mesma linha" {
+    const gpa = std.testing.allocator;
+    var p: Parsed = try .init(gpa, "const a = x < 0 and\n    y < 0;");
+    defer p.deinit(gpa);
+    const found = try mutants(gpa, p);
+    defer {
+        for (found) |m| gpa.free(m.description);
+        gpa.free(found);
+    }
+    try std.testing.expectEqual(2, found.len);
+    try std.testing.expectEqual(1, found[0].line);
+    try std.testing.expectEqual(13, found[0].column);
+    try std.testing.expectEqual(2, found[1].line);
+    try std.testing.expectEqual(7, found[1].column);
+}
+
 test "mutants: apaga o return inteiro, até o ponto e vírgula" {
     try expectMutations("fn f() void { if (c) return; g(); }", &.{"fn f() void { if (c) {} g(); }"});
     try expectMutations("fn f() u8 { return h(a, b); }", &.{"fn f() u8 { {} }"});
@@ -225,54 +244,15 @@ test "mutants: não muta código de blocos test" {
     try expectMutations("test \"t\" { _ = 1 + 2; }", &.{});
 }
 
-/// Comentário `// mutation: disable — <motivo>` numa linha do código.
-pub const Directive = struct { line: u32, has_reason: bool };
-
+/// Comentário que desliga a mutação na linha dele e na de baixo.
 const directive_marker = "// mutation: disable";
+const Directive = source.Directive;
 
-/// Comentários de desativação, com a linha (a partir de 1) de cada um.
-pub fn directives(gpa: std.mem.Allocator, code: []const u8) ![]Directive {
-    var list: std.ArrayList(Directive) = .empty;
-    errdefer list.deinit(gpa);
-    var lines = std.mem.splitScalar(u8, code, '\n');
-    var n: u32 = 1;
-    while (lines.next()) |text| : (n += 1) {
-        const at = std.mem.indexOf(u8, text, directive_marker) orelse continue;
-        const rest = std.mem.trim(u8, text[at + directive_marker.len ..], " \t\r—-");
-        try list.append(gpa, .{ .line = n, .has_reason = rest.len > 0 });
-    }
-    return list.toOwnedSlice(gpa);
+fn directives(gpa: std.mem.Allocator, code: []const u8) ![]Directive {
+    return source.directives(gpa, code, directive_marker);
 }
 
-/// O comentário vale para a própria linha e para a linha de baixo.
-pub fn isDisabled(ds: []const Directive, line: u32) bool {
-    for (ds) |d| {
-        if (d.has_reason and (line == d.line or line == d.line + 1)) return true;
-    }
-    return false;
-}
-
-test "directives: acha o comentário e diz se tem motivo" {
-    const gpa = std.testing.allocator;
-    const code =
-        \\const a = x + y; // mutation: disable — overflow impossível aqui
-        \\// mutation: disable
-        \\const b = x - y;
-    ;
-    const ds = try directives(gpa, code);
-    defer gpa.free(ds);
-    try std.testing.expectEqual(2, ds.len);
-    try std.testing.expectEqual(Directive{ .line = 1, .has_reason = true }, ds[0]);
-    try std.testing.expectEqual(Directive{ .line = 2, .has_reason = false }, ds[1]);
-}
-
-test "isDisabled: vale na linha e na de baixo, só com motivo" {
-    const ds = [_]Directive{ .{ .line = 1, .has_reason = true }, .{ .line = 5, .has_reason = false } };
-    try std.testing.expect(isDisabled(&ds, 1));
-    try std.testing.expect(isDisabled(&ds, 2));
-    try std.testing.expect(!isDisabled(&ds, 3));
-    try std.testing.expect(!isDisabled(&ds, 6));
-}
+const isDisabled = source.isCovered;
 
 pub const Outcome = enum { killed, survived, no_compile, timeout };
 

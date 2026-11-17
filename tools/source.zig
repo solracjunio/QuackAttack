@@ -36,6 +36,11 @@ pub const Parsed = struct {
         return false;
     }
 
+    /// Coluna do token, começando em 1.
+    pub fn column(self: Parsed, token: Ast.TokenIndex) u32 {
+        return @intCast(self.tree.tokenLocation(0, token).column + 1);
+    }
+
     /// Linha do token, começando em 1.
     pub fn line(self: Parsed, token: Ast.TokenIndex) u32 {
         return @intCast(self.tree.tokenLocation(0, token).line + 1);
@@ -80,6 +85,32 @@ pub fn writeZon(gpa: std.mem.Allocator, io: std.Io, path: []const u8, value: any
     try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = out.written() });
 }
 
+/// Comentário de exceção (`// mutation: disable — <motivo>`,
+/// `// magic: allow — <motivo>`) numa linha do código.
+pub const Directive = struct { line: u32, has_reason: bool };
+
+/// Comentários com `marker`, com a linha (a partir de 1) de cada um.
+pub fn directives(gpa: std.mem.Allocator, code: []const u8, marker: []const u8) ![]Directive {
+    var list: std.ArrayList(Directive) = .empty;
+    errdefer list.deinit(gpa);
+    var lines = std.mem.splitScalar(u8, code, '\n');
+    var n: u32 = 1;
+    while (lines.next()) |text| : (n += 1) {
+        const at = std.mem.indexOf(u8, text, marker) orelse continue;
+        const rest = std.mem.trim(u8, text[at + marker.len ..], " \t\r—-");
+        try list.append(gpa, .{ .line = n, .has_reason = rest.len > 0 });
+    }
+    return list.toOwnedSlice(gpa);
+}
+
+/// O comentário vale para a própria linha e para a linha de baixo, e só com motivo.
+pub fn isCovered(ds: []const Directive, line: u32) bool {
+    for (ds) |d| {
+        if (d.has_reason and (line == d.line or line == d.line + 1)) return true;
+    }
+    return false;
+}
+
 /// Primeiro token com este texto (para os testes acharem tokens).
 fn findToken(tree: Ast, text: []const u8) Ast.TokenIndex {
     var i: Ast.TokenIndex = 0;
@@ -105,6 +136,12 @@ test "inTest: verdadeiro para token de bloco test, falso fora dele" {
     try std.testing.expect(p.inTest(findToken(p.tree, "42")));
 }
 
+test "column: começa em 1" {
+    var p: Parsed = try .init(std.testing.allocator, sample);
+    defer p.deinit(std.testing.allocator);
+    try std.testing.expectEqual(12, p.column(findToken(p.tree, "7")));
+}
+
 test "line: começa em 1" {
     var p: Parsed = try .init(std.testing.allocator, sample);
     defer p.deinit(std.testing.allocator);
@@ -117,4 +154,26 @@ test "inTest: o primeiro e o último token do bloco test contam como dentro" {
     const last: Ast.TokenIndex = @intCast(p.tree.tokens.len - 2); // o último é o fim de arquivo
     try std.testing.expect(p.inTest(findToken(p.tree, "test")));
     try std.testing.expect(p.inTest(last));
+}
+
+test "directives: acha o comentário e diz se tem motivo" {
+    const gpa = std.testing.allocator;
+    const code =
+        \\const a = x + y; // mutation: disable — overflow impossível aqui
+        \\// mutation: disable
+        \\const b = x - y;
+    ;
+    const ds = try directives(gpa, code, "// mutation: disable");
+    defer gpa.free(ds);
+    try std.testing.expectEqual(2, ds.len);
+    try std.testing.expectEqual(Directive{ .line = 1, .has_reason = true }, ds[0]);
+    try std.testing.expectEqual(Directive{ .line = 2, .has_reason = false }, ds[1]);
+}
+
+test "isCovered: vale na linha e na de baixo, só com motivo" {
+    const ds = [_]Directive{ .{ .line = 1, .has_reason = true }, .{ .line = 5, .has_reason = false } };
+    try std.testing.expect(isCovered(&ds, 1));
+    try std.testing.expect(isCovered(&ds, 2));
+    try std.testing.expect(!isCovered(&ds, 3));
+    try std.testing.expect(!isCovered(&ds, 6));
 }
