@@ -89,20 +89,20 @@ Os três pilares da palestra do Ryan Hipple sobre SOAP. São as metas que o cód
 
 ### Modular: dá para tirar, trocar ou testar uma parte sem mexer nas outras?
 
-- [ ] **0 imports entre sistemas:** nenhum arquivo de `src/systems/` importa outro sistema; a comunicação é só pela fila de eventos.
-- [ ] **Lógica testável sem janela:** os testes rodam em `zig build test` sem linkar a raylib.
-- [ ] **Classe nova toca no máximo 2 arquivos:** o `classes.zon` e, se tiver comportamento novo, um arquivo de sistema. (O mago, na fase 3, é o teste disso.)
+- [x] **0 imports entre sistemas:** nenhum arquivo de `src/systems/` importa outro sistema; a comunicação é só pela fila de eventos.
+- [x] **Lógica testável sem janela:** os testes rodam em `zig build test` sem linkar a raylib.
+- [ ] **Classe nova toca no máximo 2 arquivos:** o `classes.zon` e, se tiver comportamento novo, um arquivo de sistema. (O mago, na fase 3, é o teste disso.) **Resultado: parcial.** Classe que reaproveita ataque e acessório toca 1 arquivo; o mago (ataque e acessório novos) tocou 7. Ver `docs/retrospectiva.md`.
 
 ### Editável: dá para mudar o comportamento sem mexer no código?
 
-- [ ] **0 números de balanceamento em `src/`:** vida, dano, alcance, tamanho de onda, tudo em `data/`.
-- [ ] **Ondas vindas de dados:** mudar `waves.zon` muda o jogo sem recompilar o código.
+- [x] **0 números de balanceamento em `src/`:** vida, dano, alcance, tamanho de onda, tudo em `data/`.
+- [x] **Ondas vindas de dados:** mudar `waves.zon` muda o jogo sem recompilar o código.
 
 ### Depurável: dá para ver o que está acontecendo e reproduzir um bug?
 
-- [ ] **Overlay de debug (F1):** quantidade de entidades, FPS e eventos do frame na tela.
-- [ ] **Seed fixa:** a mesma seed gera a mesma partida, então todo bug pode ser reproduzido.
-- [ ] **Todo bug corrigido ganha um teste** que falhava antes da correção.
+- [x] **Overlay de debug (F1):** quantidade de entidades, FPS e eventos do frame na tela.
+- [x] **Seed fixa:** a mesma seed gera a mesma partida, então todo bug pode ser reproduzido.
+- [x] **Todo bug corrigido ganha um teste** que falhava antes da correção.
 
 ### Como medir os pilares
 

@@ -139,6 +139,23 @@ Já uma classe que **reaproveita** um ataque e um acessório (por exemplo, um "b
 - **Variáveis observáveis continuam sem fazer falta:** o HUD (vida e onda), os avisos de pausa e o fim de jogo leem o `World` direto, a cada frame. Para o MVP, a resposta da nota "O essencial" é: não precisou.
 - **Sorteio determinístico:** a classe do patinho novo vem do `World.rng`, e o teste de determinismo agora exige que a partida de teste passe de onda.
 
+## Fase 5: Medições e retrospectiva
+
+| Medição | Valor |
+|---|---|
+| Tempo gasto | ~35 min |
+| API de Zig de outra versão escrita pelo Claude | 1, num script descartável de medição (não no repositório): `std.time.Timer` não existe mais (o relógio agora é `std.Io.Timestamp.now(io, .awake)`) |
+| Metas dos pilares cumpridas | 7 de 8 (classe nova: parcial) |
+| Entidades na tela antes de cair de 60 FPS | ~1.000 inimigos (Windows nativo, `--bench`); a simulação sozinha aguenta 50 mil em 0,12 ms por passo |
+
+A retrospectiva completa, com a comparação com a série ROG, está em `docs/retrospectiva.md`.
+
+### Notas para o post
+
+- **O primeiro benchmark não media nada:** os patinhos matavam os 250 inimigos de cada etapa antes de ela acabar, e a contagem voltava a 0. Os inimigos do benchmark passaram a ter vida máxima (continuam levando tiros, então o custo do combate entra na medida).
+- **Medir no WSL engana:** pelo WSLg, 250 inimigos já derrubavam o FPS para 42; no executável nativo, o mesmo jogo segura 1.000 a 60 FPS.
+- **Métricas comparáveis exigem o mesmo método:** o primeiro script de comparação contava como "números soltos" o texto ZON de exemplo dentro de uma string multilinha. Conferir com a AST (que dizia 0) mostrou o erro no script, não no código.
+
 <!-- quality:begin (gerado pelo zig build quality; não editar à mão) -->
 ## Qualidade (`zig build quality`)
 
@@ -163,7 +180,7 @@ Já uma classe que **reaproveita** um ataque e um acessório (por exemplo, um "b
 |---|---|---|
 | Cobertura (linhas) | 🟢 100.0% (584/584) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
 | Mutação | ✅ 0 sobrevivente(s); 161 morto(s), 1 por tempo esgotado, 79 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
-| Complexidade (maior) | 🟢 7 (`write`, `events.zig:29`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
+| Complexidade (maior) | 🟢 9 (`main`, `main.zig:19`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
 
 ### Cobertura por arquivo
 
@@ -199,8 +216,8 @@ Já uma classe que **reaproveita** um ataque e um acessório (por exemplo, um "b
 
 | Função | Onde | Complexidade |
 |---|---|---|
+| `main` | `main.zig:19` | 🟢 9 |
 | `write` | `events.zig:29` | 🟢 7 |
-| `main` | `main.zig:18` | 🟢 7 |
 | `draw` | `ui/hud.zig:18` | 🟢 7 |
 | `hash` | `world.zig:115` | 🟢 7 |
 | `Pool` | `pool.zig:8` | 🟢 6 |

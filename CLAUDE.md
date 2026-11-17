@@ -13,7 +13,7 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
   - I/O passa por `std.Io` (`init.io`); escrita por `std.Io.Writer` com buffer e `flush()`.
   - `std.ArrayList(T)` não guarda o allocator: comece com `.empty` e passe o allocator em cada chamada (`append(gpa, x)`, `deinit(gpa)`).
   - No `build.zig`: `b.createModule` / `b.addModule` com `root_module`; argumentos do `zig build run -- ...` via `run_cmd.addPassthruArgs()`. Caminhos do projeto: `b.path(...)` (não existe `b.pathFromRoot`).
-  - Não existem mais: `std.fmt.bufPrintZ` (use `bufPrintSentinel(buf, fmt, args, 0)`), repetição de array com `**` (use `@splat`), `std.Random.enumValue` (use `enumValueWithIndex`), `std.testing.refAllDeclsRecursive`. `@enumFromInt` virou `@fromBackingInt`.
+  - Não existem mais: `std.time.Timer` (use `std.Io.Timestamp.now(io, .awake)` e `durationTo`), `std.fmt.bufPrintZ` (use `bufPrintSentinel(buf, fmt, args, 0)`), repetição de array com `**` (use `@splat`), `std.Random.enumValue` (use `enumValueWithIndex`), `std.testing.refAllDeclsRecursive`. `@enumFromInt` virou `@fromBackingInt`.
   - `@Vector(2, f32)` ocupa 16 bytes no backend do Zig e 8 no LLVM; o preenchimento tem lixo. Para hash ou comparação de bytes, use `vec.toArray`.
   - `@min(x, constante)` devolve um inteiro estreito (ex.: `u5`). Dê o tipo do resultado (`const n: usize = @min(...)`) antes de fazer contas.
 - raylib-zig fixado num commit do ramo `devel` (raylib 6.2) no `build.zig.zon`. Para ver a API: `zig-pkg/raylib_zig-*/lib/raylib.zig`.
@@ -29,6 +29,7 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 - `zig build test`: todos os testes (lógica e ferramentas). **Rodar antes de dar qualquer tarefa por terminada.**
 - `zig build test-headless`: só a lógica, sem linkar a raylib.
 - `devbox run windows`: compila o `.exe` do Windows em `zig-out/bin/`. Rode de novo sempre que `data/game.zon` ganhar campos: um `.exe` antigo recusa campos que não conhece. Abra o `.exe` a partir da raiz do projeto (ele lê `data/game.zon`).
+- `zig build run -- --bench` (ou `quackattack.exe --bench`): benchmark de entidades na tela até o FPS cair abaixo de 60; imprime uma tabela. Meça desempenho de desenho no `.exe` nativo do Windows, não pelo WSLg.
 - `zig build run`: abre o jogo (←/→ ou A/D giram a líder; F1 liga o overlay de debug; R recomeça no fim de jogo).
 - `zig build quality`: imports, números mágicos, complexidade, cobertura (kcov), mutação e commits `fix:`. Imprime as tabelas, atualiza o bloco gerado do `docs/medicoes.md` e reprova pelas regras do `PLANO.md`. No CI, as tabelas vão para o *Summary* da execução.
 - `zig fmt --check build.zig src/ tools/ data/check.zig`: formatação (o CI também confere).
