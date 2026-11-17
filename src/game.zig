@@ -2,6 +2,9 @@
 const std = @import("std");
 
 pub const health = @import("health.zig");
+pub const vec = @import("vec.zig");
+pub const trail = @import("trail.zig");
+pub const testing = @import("testing.zig");
 
 /// Faz o compilador analisar todas as declarações públicas, também dentro
 /// dos tipos. Sem isso o Zig não compila funções que nenhum teste chama, e
