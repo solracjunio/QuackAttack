@@ -37,6 +37,11 @@ pub fn main(init: std.process.Init) !void {
     var pending: f32 = 0;
     while (!rl.windowShouldClose()) {
         if (rl.isKeyPressed(.f1)) show_debug = !show_debug;
+        // Fim de jogo: R recomeça (mesma configuração e mesma seed).
+        if (world.queue_health.isDead() and rl.isKeyPressed(.r)) {
+            world.deinit(gpa);
+            world = try .init(gpa, config);
+        }
         frame_events.clearRetainingCapacity();
         pending += @min(rl.getFrameTime(), max_frame_seconds);
         while (pending >= step) : (pending -= step) {

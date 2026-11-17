@@ -22,5 +22,7 @@ pub const bar_back = hex(0x16161A, opaque_alpha);
 pub const bar_fill = hex(0xFF3D5E, opaque_alpha);
 pub const arrow = hex(0xF5F5F5, opaque_alpha);
 pub const life = hex(0xFF4D6D, opaque_alpha);
+pub const banner = hex(0xC792EA, opaque_alpha);
+pub const dim = hex(0x000000, 140); // 55%
 pub const text = hex(0xFFFFFF, opaque_alpha);
 pub const panel = hex(0x000000, 166); // 65%
