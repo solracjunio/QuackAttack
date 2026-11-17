@@ -61,6 +61,32 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 - **Zig, vetores:** `@Vector(2, f32)` soma e multiplica sem código extra, mas o índice precisa ser conhecido em tempo de compilação e não dá para tirar um `*f32` de um elemento. A reflexão foi escrita por eixo (`axis` comptime).
 - **Vazamento em erro:** `std.testing.checkAllAllocationFailures` faz cada alocação falhar uma vez. Sem o `errdefer` no `World.init`, ele acusa o vazamento.
 
+## Fase 2: Inimigos e combate
+
+| Medição | Valor |
+|---|---|
+| Tempo gasto | ~35 min |
+| API de Zig de outra versão escrita pelo Claude | 2: repetição de array com `**` (virou `@splat`) e `std.fmt.bufPrintZ` (virou `bufPrintSentinel`) |
+| Testes da lógica | 83, mais 1 do `data/check.zig` (eram 34) |
+| Bugs pegos pelos testes | 1: o `hash()` lia o lixo do preenchimento do `@Vector`, e duas partidas iguais davam hashes diferentes |
+| Bugs que só apareceram rodando o jogo | 1: `integer overflow` no overlay de debug (`@min` com constante devolve `u5`) |
+| Mutantes sobreviventes no primeiro `quality` | 11 → 0 |
+| Tempo do `zig build quality` | ~3 min (eram ~6 s): 156 mutantes, cada um compila os testes |
+| Incidentes | 1: um mutante derrubou o WSL por falta de memória (ver abaixo) |
+
+### Notas para o post
+
+- **O teste de determinismo pagou o custo no primeiro dia.** Duas partidas com a mesma seed e a mesma entrada divergiam já no passo 0. A causa não estava na simulação: `@Vector(2, f32)` ocupa 16 bytes no backend do Zig, e os 8 de alinhamento têm lixo. O `hash()` lia os bytes crus. Sem o teste, isso viraria "o replay às vezes não bate" na fase de depuração.
+- **E o tamanho depende do backend:** no build de cobertura (LLVM) o mesmo vetor ocupa 8 bytes. Um teste que presumia o tamanho passou nos testes normais e falhou só no kcov.
+- **Eventos como objetos funcionaram sem esforço:** `projeteis` e `contato` só acrescentam `damage`; `aplicar_dano` gera `died`; `limpar_mortos` remove. Nenhum sistema importa outro. Dois tiros mortais no mesmo passo geram um `died` só, porque `aplicar_dano` só emite na passagem de vivo para morto.
+- **Handle com geração na prática:** um evento com handle de um inimigo que já saiu (e cuja vaga foi reaproveitada) é ignorado, não acerta o inimigo novo. Tem teste para isso.
+- **Variáveis observáveis ainda não fizeram falta:** o HUD e o overlay leem o `World` direto, a cada frame.
+- **O que a mutação achou desta vez:** testes com posição aleatória não pegavam os cantos do spawner (a solução foi separar `pointOnSide` e testar `t = 0` e `t = 1`); um helper de teste fora do bloco `test` era mutado como se fosse produção; e um equivalente real em `perseguir` (`dist == step` chega na líder pelos dois caminhos).
+- **Custo da mutação:** com 156 mutantes, o `quality` passou de segundos para ~4 minutos. Ainda dá para rodar antes de cada commit.
+- **Um mutante derrubou o WSL.** Trocar `spawn_timer += interval` por `-=` no `spawner` faz o `while` criar inimigos para sempre. Com 60 s de timeout por mutante, ele chegou a 5,8 GB (medido depois, com teto); somado à compilação LLVM da cobertura rodando em paralelo, encheu os 16 GB do WSL. Correção no `mutate`: compilar sem limite e rodar o binário com `ulimit -v` de 1 GiB e timeout de 10 s. No `quality` seguinte, a memória livre não passou de 13,2 GB para baixo. Lição: teste de mutação roda código quebrado de propósito; precisa de teto de memória, não só de tempo.
+- **E enchia o disco:** cada mutante era compilado no cache principal do Zig, e as saídas ficavam para sempre (18 GB depois de algumas execuções). Agora os mutantes usam um cache próprio na pasta de trabalho, apagado no fim (o cache ficou em ~240 MB).
+- **Floats em teste:** `1.9 + 0.1` em `f32` não fecha em `2`, e o spawner "atrasava" um passo. O código estava certo; o teste passou a usar valores exatos em binário.
+
 <!-- quality:begin (gerado pelo zig build quality; não editar à mão) -->
 ## Qualidade (`zig build quality`)
 
@@ -75,39 +101,49 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 | Modular | Lógica testável sem engine | ✅ testes rodam sem a raylib | Reprova se não compilar |
 | Editável | Números mágicos em `src/` | 🟢 0 | 🟢 0 · 🟡 1–5 · 🔴 > 5 |
 | Editável | Dados válidos | ✅ `data/check.zig` passou | Reprova se falhar |
-| Depurável | Determinismo (mesma seed, mesmo hash) | ⏳ ainda não há mundo (fase 2) | Reprova se diferir |
-| Depurável | Todo evento aparece no debug | ⏳ ainda não há eventos (fase 2) | Reprova no build |
+| Depurável | Determinismo (mesma seed, mesmo hash) | ✅ teste de `sim.zig` | Reprova se diferir |
+| Depurável | Todo evento aparece no debug | ✅ `switch` exaustivo em `events.describe` | Reprova no build |
 | Depurável | Commits `fix:` com teste | 🟢 nenhum commit `fix:` ainda | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |
 
 ### Testes
 
 | Medição | Valor | Regra |
 |---|---|---|
-| Cobertura (linhas) | 🟢 100.0% (125/125) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
-| Mutação | ✅ 0 sobrevivente(s); 46 morto(s), 0 por tempo esgotado, 17 não compilou, 2 desativado(s) | Todo sobrevivente reprova |
-| Complexidade (maior) | 🟢 5 (`refAllDeclsRecursive`, `game.zig:18`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
+| Cobertura (linhas) | 🟢 100.0% (386/386) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
+| Mutação | ✅ 0 sobrevivente(s); 110 morto(s), 1 por tempo esgotado, 42 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
+| Complexidade (maior) | 🟢 8 (`draw`, `main.zig:86`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
 
 ### Cobertura por arquivo
 
 | Arquivo | Linhas | Cobertura |
 |---|---|---|
-| `config.zig` | 24/24 | 🟢 100.0% |
-| `systems/mover.zig` | 21/21 | 🟢 100.0% |
 | `testing.zig` | 5/5 | 🟢 100.0% |
-| `world.zig` | 20/20 | 🟢 100.0% |
-| `trail.zig` | 28/28 | 🟢 100.0% |
-| `systems/seguir.zig` | 5/5 | 🟢 100.0% |
-| `vec.zig` | 10/10 | 🟢 100.0% |
-| `health.zig` | 8/8 | 🟢 100.0% |
+| `config.zig` | 36/36 | 🟢 100.0% |
+| `events.zig` | 10/10 | 🟢 100.0% |
+| `sim.zig` | 11/11 | 🟢 100.0% |
+| `world.zig` | 55/55 | 🟢 100.0% |
 | `game.zig` | 4/4 | 🟢 100.0% |
+| `systems/aplicar_dano.zig` | 26/26 | 🟢 100.0% |
+| `systems/perseguir.zig` | 17/17 | 🟢 100.0% |
+| `health.zig` | 8/8 | 🟢 100.0% |
+| `vec.zig` | 12/12 | 🟢 100.0% |
+| `systems/limpar_mortos.zig` | 4/4 | 🟢 100.0% |
+| `systems/mover.zig` | 21/21 | 🟢 100.0% |
+| `trail.zig` | 28/28 | 🟢 100.0% |
+| `pool.zig` | 43/43 | 🟢 100.0% |
+| `systems/projeteis.zig` | 25/25 | 🟢 100.0% |
+| `systems/contato.zig` | 27/27 | 🟢 100.0% |
+| `systems/atacar.zig` | 32/32 | 🟢 100.0% |
+| `systems/spawner.zig` | 17/17 | 🟢 100.0% |
+| `systems/seguir.zig` | 5/5 | 🟢 100.0% |
 
 ### Funções mais complexas
 
 | Função | Onde | Complexidade |
 |---|---|---|
-| `refAllDeclsRecursive` | `game.zig:18` | 🟢 5 |
-| `readTurn` | `main.zig:63` | 🟢 5 |
-| `reflectAxis` | `systems/mover.zig:25` | 🟢 5 |
-| `pointAt` | `trail.zig:22` | 🟢 4 |
-| `validate` | `config.zig:37` | 🟢 3 |
+| `draw` | `main.zig:86` | 🟢 8 |
+| `Pool` | `pool.zig:8` | 🟢 6 |
+| `update` | `systems/aplicar_dano.zig:7` | 🟢 6 |
+| `anyContact` | `systems/contato.zig:15` | 🟢 6 |
+| `hash` | `world.zig:88` | 🟢 6 |
 <!-- quality:end -->

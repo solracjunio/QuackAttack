@@ -12,7 +12,10 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
   - `main` recebe `std.process.Init` (`pub fn main(init: std.process.Init) !void`), que traz `init.io`, `init.arena`, os argumentos etc. Um `main` sem parâmetros também vale.
   - I/O passa por `std.Io` (`init.io`); escrita por `std.Io.Writer` com buffer e `flush()`.
   - `std.ArrayList(T)` não guarda o allocator: comece com `.empty` e passe o allocator em cada chamada (`append(gpa, x)`, `deinit(gpa)`).
-  - No `build.zig`: `b.createModule` / `b.addModule` com `root_module`; argumentos do `zig build run -- ...` via `run_cmd.addPassthruArgs()`.
+  - No `build.zig`: `b.createModule` / `b.addModule` com `root_module`; argumentos do `zig build run -- ...` via `run_cmd.addPassthruArgs()`. Caminhos do projeto: `b.path(...)` (não existe `b.pathFromRoot`).
+  - Não existem mais: `std.fmt.bufPrintZ` (use `bufPrintSentinel(buf, fmt, args, 0)`), repetição de array com `**` (use `@splat`), `std.Random.enumValue` (use `enumValueWithIndex`), `std.testing.refAllDeclsRecursive`. `@enumFromInt` virou `@fromBackingInt`.
+  - `@Vector(2, f32)` ocupa 16 bytes no backend do Zig e 8 no LLVM; o preenchimento tem lixo. Para hash ou comparação de bytes, use `vec.toArray`.
+  - `@min(x, constante)` devolve um inteiro estreito (ex.: `u5`). Dê o tipo do resultado (`const n: usize = @min(...)`) antes de fazer contas.
 - raylib-zig fixado num commit do ramo `devel` (raylib 6.2) no `build.zig.zon`. Para ver a API: `zig-pkg/raylib_zig-*/lib/raylib.zig`.
 
 ## Ambiente
@@ -25,14 +28,14 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 
 - `zig build test`: todos os testes (lógica e ferramentas). **Rodar antes de dar qualquer tarefa por terminada.**
 - `zig build test-headless`: só a lógica, sem linkar a raylib.
-- `zig build run`: abre o jogo (←/→ ou A/D giram a líder).
+- `zig build run`: abre o jogo (←/→ ou A/D giram a líder; F1 liga o overlay de debug).
 - `zig build quality`: imports, números mágicos, complexidade, cobertura (kcov), mutação e commits `fix:`. Imprime as tabelas, atualiza o bloco gerado do `docs/medicoes.md` e reprova pelas regras do `PLANO.md`. No CI, as tabelas vão para o *Summary* da execução.
 - `zig fmt --check build.zig src/ tools/ data/check.zig`: formatação (o CI também confere).
 
 ## Ferramentas de qualidade (`tools/`)
 
 - `source.zig` (AST comum), `analyze.zig`, `mutate.zig`, `report.zig`. Também seguem TDD; os testes delas rodam no `zig build test`.
-- `mutate` trabalha numa cópia de `src/` no cache do Zig: o código original nunca é alterado.
+- `mutate` trabalha numa cópia de `src/` no cache do Zig: o código original nunca é alterado. Cada mutante é compilado (cache próprio, apagado no fim) e o binário roda com `ulimit -v` de 1 GiB e timeout de 10 s (`build.zig`). Não tire esses limites: um mutante que aloca em laço já derrubou o WSL.
 - Os operadores de mutação não cobrem tudo (ex.: não removem um `@min`). Mutação limpa não prova que todo comportamento tem teste.
 - Exceções com motivo obrigatório (sem motivo, não valem):
   - `// mutation: disable — <motivo>`: só para mutante equivalente (não muda o comportamento).
@@ -47,6 +50,10 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 - Os testes ficam no mesmo arquivo do código (`test "cenário: resultado esperado" { ... }`), como é o normal em Zig. Todo arquivo de lógica é importado em `src/game.zig` para os testes dele rodarem.
 - Ajudas de teste compartilhadas ficam em `src/testing.zig` (ex.: `expectVec`). Números de teste fora de um bloco `test` contam como mágicos: monte os dados dentro do teste ou use `config.example()`.
 - Testes de um sistema não importam outro sistema (a regra vale também nos testes): montam o estado direto no `World`.
+- Helper de teste com contas ou números: declare dentro do bloco `test` (`const Helper = struct { fn ... };`). Fora dele, a mutação e os números mágicos o tratam como produção.
+- Floats nos testes: use valores exatos em binário (0.5, 0.25, 1.5). `1.9 + 0.1` em `f32` não dá `2`.
+- Ordem do passo (`src/sim.zig`): limpa os eventos, `mover`, `seguir`, `spawner`, `perseguir`, `atacar`, `projeteis`, `contato`, `aplicar_dano`, `limpar_mortos`. Dano e morte só acontecem por eventos (`src/events.zig`); todo tipo de evento novo precisa de texto no `describe`.
+- Aleatoriedade só pelo `World.rng` (criado com a `seed` do `data/game.zon`). O teste de determinismo em `sim.zig` reprova se duas partidas iguais divergirem.
 - Dados: `data/game.zon` é lido quando o jogo abre (mudar não exige recompilar). Todo campo novo entra em `Config` (`src/config.zig`) e, se puder quebrar o jogo, ganha regra no `validate`. O `data/check.zig` confere os arquivos reais no `zig build test`.
 - A lógica (`src/game.zig` e o que ele importa) **nunca** importa a raylib. Só `main.zig` e `src/ui/` usam a raylib.
 - Nenhum número de balanceamento no código: tudo em `data/`. Números de tela (tamanho da janela, fonte) podem ficar em `main.zig` e `ui/`.
