@@ -1,0 +1,90 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.2/.schema/devbox.schema.json",
+  "packages": {
+    "zig_0_17": "0.17.0",
+    "kcov": "latest",
+    "xorg.libX11": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXcursor": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXrandr": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXinerama": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXi": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXext": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXrender": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.libXfixes": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "xorg.xorgproto": "latest",
+    "libGL": {
+      "version": "latest",
+      "outputs": [
+        "out",
+        "dev"
+      ]
+    },
+    "mesa": "latest"
+  },
+  "shell": {
+    "init_hook": [
+      "# OpenGL: o libGL (glvnd) do Nix precisa saber onde está a Mesa do Nix",
+      "export __GLX_VENDOR_LIBRARY_NAME=mesa",
+      "export __EGL_VENDOR_LIBRARY_DIRS=\"$DEVBOX_PACKAGES_DIR/share/glvnd/egl_vendor.d\"",
+      "export LIBGL_DRIVERS_PATH=\"$DEVBOX_PACKAGES_DIR/lib/dri\"",
+      "export LD_LIBRARY_PATH=\"$DEVBOX_PACKAGES_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"",
+      "# WSLg: usa a GPU via D3D12 (libd3d12.so vem do Windows)",
+      "if [ -d /usr/lib/wsl/lib ]; then export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH:/usr/lib/wsl/lib\"; export GALLIUM_DRIVER=d3d12; fi"
+    ],
+    "scripts": {
+      "build": "zig build",
+      "run": "zig build run",
+      "test": "zig build test",
+      "test-headless": "zig build test-headless",
+      "quality": "zig build quality"
+    }
+  }
+}

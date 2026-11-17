@@ -1,0 +1,10 @@
+# Devbox
+.devbox/
+
+# Zig
+.zig-cache/
+zig-out/
+zig-pkg/
+
+# Cobertura (kcov)
+kcov-out/
