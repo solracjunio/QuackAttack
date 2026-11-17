@@ -3,6 +3,8 @@ const std = @import("std");
 
 pub const health = @import("health.zig");
 pub const vec = @import("vec.zig");
+pub const pool = @import("pool.zig");
+pub const events = @import("events.zig");
 pub const trail = @import("trail.zig");
 pub const config = @import("config.zig");
 pub const world = @import("world.zig");
