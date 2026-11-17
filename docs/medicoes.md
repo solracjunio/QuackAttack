@@ -1,12 +1,14 @@
 # Medições
 
+Os tempos são estimativas do Claude, pelos horários da sessão (passagens de sessão registradas, pushes e execuções do CI). Contam o tempo de relógio do trabalho, não o de leitura e revisão.
+
 Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 
 ## Fase 0: Setup
 
 | Medição | Valor |
 |---|---|
-| Tempo gasto | _a preencher_ |
+| Tempo gasto | ~20 min (devbox ~10 min + fase 0 ~10 min) |
 | API de Zig de outra versão escrita pelo Claude | 0 (o esqueleto do `zig init` 0.17 foi lido antes de escrever código) |
 | Testes | 6 (`health.zig`) |
 | Bugs pegos pelos testes | 0 |
@@ -25,7 +27,7 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 
 | Medição | Valor |
 |---|---|
-| Tempo gasto | _a preencher_ |
+| Tempo gasto | ~30 min |
 | API de Zig de outra versão escrita pelo Claude | 2: `@enumFromInt` (o `zig fmt` do 0.17 trocou por `@fromBackingInt`) e `b.pathFromRoot` no `build.zig` (não existe mais; o certo é `LazyPath` com `addDirectoryArg2(..., .{ .make_absolute = true })`) |
 | Quase-erros (conferidos na std antes de escrever) | `std.fs.path.resolve` → `resolveAlloc`; `std.testing.refAllDeclsRecursive` não existe mais; `captureStdOut` agora recebe opções |
 | Testes das ferramentas | 25 (source 3, analyze 9, mutate 6, report 7) |
@@ -38,6 +40,26 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 - **Cobertura enganosa no Zig:** o Zig só compila o que é usado. Sem o `refAllDeclsRecursive`, uma função pública sem teste não aparece no kcov, e a cobertura sobe em vez de cair.
 - **Limite dos operadores:** apagar o teste "a cura para no máximo" não deixou mutante vivo, porque nenhum operador remove o `@min`. A cobertura também continuou 100%. Esse comportamento só está protegido porque o teste existe.
 - **Prova de que reprova:** sem os dois testes de cura, o `quality` saiu com código 1, apontou `health.zig:23: +| → -|` e a cobertura caiu para 🟡 83%.
+
+## Fase 1: Fila
+
+| Medição | Valor |
+|---|---|
+| Tempo gasto | ~25 min |
+| API de Zig de outra versão escrita pelo Claude | 0 |
+| Testes da lógica | 34, mais 1 do `data/check.zig` (eram 6) |
+| Bugs pegos pelos testes | 1: `pointAt` dava NaN com dois pontos iguais seguidos (`0/0`) |
+| Mutantes sobreviventes no primeiro `quality` | 8 → 0 |
+
+### Notas para o post
+
+- **O que a mutação achou:** dos 8 sobreviventes, 5 eram testes faltando (bordas da reflexão, `turn_speed = 0`, `prune` além do caminho), 1 era uma regra redundante no `validate` (o mundo > 0 já é garantido por "a líder cabe no mundo") e 1 era equivalente de verdade (`<` e `<=` dão o mesmo ponto no `pointAt`).
+- **Um teste fraco que passava:** o teste da reflexão usava `pos = 0` depois de andar, e com isso `12 + (12 - 0)` e `12 + (12 + 0)` dão o mesmo. Trocar os números fez o mutante morrer.
+- **O comentário de exceção escondia mutantes:** o `// mutation: disable` vale para a linha inteira, e a linha tinha também um `+` sem teste. Isolar a comparação numa linha só fez o `+` aparecer, e ele morreu.
+- **Ferramentas melhoradas pelo uso:** coluna no mutante (dois `<` na mesma linha ficavam ambíguos) e o `// magic: allow — <motivo>` no `analyze`.
+- **Números mágicos em helpers de teste:** os helpers ficam fora dos blocos `test`, então a tolerância `1e-3` e os pontos de exemplo contavam como mágicos. A solução foi um `src/testing.zig` com uma tolerância só e os dados de exemplo montados dentro dos testes.
+- **Zig, vetores:** `@Vector(2, f32)` soma e multiplica sem código extra, mas o índice precisa ser conhecido em tempo de compilação e não dá para tirar um `*f32` de um elemento. A reflexão foi escrita por eixo (`axis` comptime).
+- **Vazamento em erro:** `std.testing.checkAllAllocationFailures` faz cada alocação falhar uma vez. Sem o `errdefer` no `World.init`, ele acusa o vazamento.
 
 <!-- quality:begin (gerado pelo zig build quality; não editar à mão) -->
 ## Qualidade (`zig build quality`)
@@ -52,7 +74,7 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 | Modular | Ciclos de imports | ✅ nenhum | Reprova se houver |
 | Modular | Lógica testável sem engine | ✅ testes rodam sem a raylib | Reprova se não compilar |
 | Editável | Números mágicos em `src/` | 🟢 0 | 🟢 0 · 🟡 1–5 · 🔴 > 5 |
-| Editável | Dados válidos | ⏳ ainda não há `data/*.zon` (fase 3) | Reprova se falhar |
+| Editável | Dados válidos | ✅ `data/check.zig` passou | Reprova se falhar |
 | Depurável | Determinismo (mesma seed, mesmo hash) | ⏳ ainda não há mundo (fase 2) | Reprova se diferir |
 | Depurável | Todo evento aparece no debug | ⏳ ainda não há eventos (fase 2) | Reprova no build |
 | Depurável | Commits `fix:` com teste | 🟢 nenhum commit `fix:` ainda | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |
@@ -61,14 +83,21 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 
 | Medição | Valor | Regra |
 |---|---|---|
-| Cobertura (linhas) | 🟢 100.0% (12/12) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
-| Mutação | ✅ 0 sobrevivente(s); 3 morto(s), 0 por tempo esgotado, 2 não compilou, 1 desativado(s) | Todo sobrevivente reprova |
-| Complexidade (maior) | 🟢 5 (`refAllDeclsRecursive`, `game.zig:11`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
+| Cobertura (linhas) | 🟢 100.0% (125/125) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
+| Mutação | ✅ 0 sobrevivente(s); 46 morto(s), 0 por tempo esgotado, 17 não compilou, 2 desativado(s) | Todo sobrevivente reprova |
+| Complexidade (maior) | 🟢 5 (`refAllDeclsRecursive`, `game.zig:18`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
 
 ### Cobertura por arquivo
 
 | Arquivo | Linhas | Cobertura |
 |---|---|---|
+| `config.zig` | 24/24 | 🟢 100.0% |
+| `systems/mover.zig` | 21/21 | 🟢 100.0% |
+| `testing.zig` | 5/5 | 🟢 100.0% |
+| `world.zig` | 20/20 | 🟢 100.0% |
+| `trail.zig` | 28/28 | 🟢 100.0% |
+| `systems/seguir.zig` | 5/5 | 🟢 100.0% |
+| `vec.zig` | 10/10 | 🟢 100.0% |
 | `health.zig` | 8/8 | 🟢 100.0% |
 | `game.zig` | 4/4 | 🟢 100.0% |
 
@@ -76,9 +105,9 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 
 | Função | Onde | Complexidade |
 |---|---|---|
-| `refAllDeclsRecursive` | `game.zig:11` | 🟢 5 |
-| `main` | `main.zig:8` | 🟢 2 |
-| `init` | `health.zig:14` | 🟢 1 |
-| `damage` | `health.zig:18` | 🟢 1 |
-| `heal` | `health.zig:22` | 🟢 1 |
+| `refAllDeclsRecursive` | `game.zig:18` | 🟢 5 |
+| `readTurn` | `main.zig:63` | 🟢 5 |
+| `reflectAxis` | `systems/mover.zig:25` | 🟢 5 |
+| `pointAt` | `trail.zig:22` | 🟢 4 |
+| `validate` | `config.zig:37` | 🟢 3 |
 <!-- quality:end -->

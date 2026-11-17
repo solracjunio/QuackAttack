@@ -25,15 +25,19 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 
 - `zig build test`: todos os testes (lógica e ferramentas). **Rodar antes de dar qualquer tarefa por terminada.**
 - `zig build test-headless`: só a lógica, sem linkar a raylib.
-- `zig build run`: abre o jogo.
+- `zig build run`: abre o jogo (←/→ ou A/D giram a líder).
 - `zig build quality`: imports, números mágicos, complexidade, cobertura (kcov), mutação e commits `fix:`. Imprime as tabelas, atualiza o bloco gerado do `docs/medicoes.md` e reprova pelas regras do `PLANO.md`. No CI, as tabelas vão para o *Summary* da execução.
-- `zig fmt --check build.zig src/ tools/`: formatação (o CI também confere).
+- `zig fmt --check build.zig src/ tools/ data/check.zig`: formatação (o CI também confere).
 
 ## Ferramentas de qualidade (`tools/`)
 
 - `source.zig` (AST comum), `analyze.zig`, `mutate.zig`, `report.zig`. Também seguem TDD; os testes delas rodam no `zig build test`.
 - `mutate` trabalha numa cópia de `src/` no cache do Zig: o código original nunca é alterado.
 - Os operadores de mutação não cobrem tudo (ex.: não removem um `@min`). Mutação limpa não prova que todo comportamento tem teste.
+- Exceções com motivo obrigatório (sem motivo, não valem):
+  - `// mutation: disable — <motivo>`: só para mutante equivalente (não muda o comportamento).
+  - `// magic: allow — <motivo>`: só para número que não é balanceamento (ex.: o `2` de `@Vector(2, f32)`).
+  - Os dois valem para a linha deles e a de baixo, **a linha inteira**. Isole a expressão numa linha só (`const x = a <= b;`), senão outros mutantes ou números da linha ficam escondidos.
 - `src/game.zig` usa `refAllDeclsRecursive` para o Zig compilar até as funções que nenhum teste chama. Sem isso elas somem da cobertura em vez de aparecer como não cobertas. Todo arquivo de lógica novo precisa ser `pub const` no `game.zig`.
 
 ## Regras
@@ -41,6 +45,9 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 - Escopo: só o que está em "O jogo (MVP)" do `PLANO.md`. O jogo existe só para testar a ideia e escrever o post.
 - TDD: teste falhando primeiro (pela asserção, não por erro de compilação), depois o mínimo para passar, depois refatorar. Toda lógica nova vem com teste.
 - Os testes ficam no mesmo arquivo do código (`test "cenário: resultado esperado" { ... }`), como é o normal em Zig. Todo arquivo de lógica é importado em `src/game.zig` para os testes dele rodarem.
+- Ajudas de teste compartilhadas ficam em `src/testing.zig` (ex.: `expectVec`). Números de teste fora de um bloco `test` contam como mágicos: monte os dados dentro do teste ou use `config.example()`.
+- Testes de um sistema não importam outro sistema (a regra vale também nos testes): montam o estado direto no `World`.
+- Dados: `data/game.zon` é lido quando o jogo abre (mudar não exige recompilar). Todo campo novo entra em `Config` (`src/config.zig`) e, se puder quebrar o jogo, ganha regra no `validate`. O `data/check.zig` confere os arquivos reais no `zig build test`.
 - A lógica (`src/game.zig` e o que ele importa) **nunca** importa a raylib. Só `main.zig` e `src/ui/` usam a raylib.
 - Nenhum número de balanceamento no código: tudo em `data/`. Números de tela (tamanho da janela, fonte) podem ficar em `main.zig` e `ui/`.
 - Sistemas não chamam uns aos outros: a comunicação é só pela fila de eventos.

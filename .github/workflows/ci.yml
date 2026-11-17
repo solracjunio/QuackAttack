@@ -17,7 +17,7 @@ jobs:
           version: 0.17.0
 
       - name: Formatação
-        run: zig fmt --check build.zig src/ tools/
+        run: zig fmt --check build.zig src/ tools/ data/check.zig
 
       # Lógica do jogo e ferramentas: não compila a raylib, então não precisa de X11 nem OpenGL.
       - name: Testes
