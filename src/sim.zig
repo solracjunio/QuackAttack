@@ -8,6 +8,7 @@ const spawner = @import("systems/spawner.zig");
 const perseguir = @import("systems/perseguir.zig");
 const mirar = @import("systems/mirar.zig");
 const atacar = @import("systems/atacar.zig");
+const magia = @import("systems/magia.zig");
 const projeteis = @import("systems/projeteis.zig");
 const contato = @import("systems/contato.zig");
 const aplicar_dano = @import("systems/aplicar_dano.zig");
@@ -27,6 +28,7 @@ pub fn step(w: *World, gpa: std.mem.Allocator, input: Input, dt: f32) !void {
     perseguir.update(w, dt);
     try mirar.update(w, gpa);
     try atacar.update(w, gpa, dt);
+    try magia.update(w, gpa, dt);
     try projeteis.update(w, gpa, dt);
     try contato.update(w, gpa, dt);
     try aplicar_dano.update(w, gpa);

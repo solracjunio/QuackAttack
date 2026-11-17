@@ -17,6 +17,7 @@ pub const spawner = @import("systems/spawner.zig");
 pub const perseguir = @import("systems/perseguir.zig");
 pub const mirar = @import("systems/mirar.zig");
 pub const atacar = @import("systems/atacar.zig");
+pub const magia = @import("systems/magia.zig");
 pub const projeteis = @import("systems/projeteis.zig");
 pub const contato = @import("systems/contato.zig");
 pub const aplicar_dano = @import("systems/aplicar_dano.zig");
