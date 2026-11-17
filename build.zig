@@ -65,7 +65,12 @@ pub fn build(b: *std.Build) void {
 const quality_tools = [_][]const u8{ "source", "analyze", "mutate", "report" };
 
 /// Segundos que cada mutante tem para rodar os testes (pega laço infinito).
-const mutant_timeout_seconds = "60";
+/// Os testes levam ~1 s; folga demais deixa um mutante que aloca sem parar crescer.
+const mutant_timeout_seconds = "10";
+
+/// Teto de memória virtual de cada mutante, em KB (1 GiB). Um mutante criava
+/// inimigos sem parar e chegou a 5,8 GB em 60 s, derrubando o WSL.
+const mutant_memory_kb = "1048576";
 
 fn toolModule(b: *std.Build, name: []const u8) *std.Build.Module {
     return b.createModule(.{
@@ -109,7 +114,7 @@ fn addQualityStep(b: *std.Build, target: std.Build.ResolvedTarget, data_check: *
     mutate.addArg("game.zig");
     _ = mutate.addOutputDirectoryArg("workspace");
     const mutation = mutate.addOutputFileArg("mutate.zon");
-    mutate.addArg(mutant_timeout_seconds);
+    mutate.addArgs(&.{ mutant_timeout_seconds, mutant_memory_kb });
     mutate.has_side_effects = true;
 
     const git_log = b.addSystemCommand(&.{ "git", "log", "--format=%x1e%s", "-p", "--unified=0" });

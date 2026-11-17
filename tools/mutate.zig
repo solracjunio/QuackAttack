@@ -21,15 +21,16 @@ pub const Report = struct {
     missing_reason: []const Place = &.{},
 };
 
-/// Uso: mutate <zig> <pasta src> <raiz dos testes, relativa a src> <pasta de trabalho> <saída .zon> <segundos por mutante>
+/// Uso: mutate <zig> <pasta src> <raiz dos testes, relativa a src> <pasta de trabalho> <saída .zon> <segundos por mutante> <memória por mutante, em KB>
 ///
 /// Copia `src/` para a pasta de trabalho e muta só a cópia: o código original
-/// nunca é alterado, mesmo se o processo for interrompido.
+/// nunca é alterado, mesmo se o processo for interrompido. Cada mutante é
+/// compilado sem limite e rodado com teto de tempo e de memória.
 pub fn main(init: std.process.Init) !void {
     const arena = init.arena.allocator();
     const io = init.io;
     const args = try init.minimal.args.toSlice(arena);
-    if (args.len != 7) return error.Usage;
+    if (args.len != 8) return error.Usage;
     const runner: Runner = .{
         .arena = arena,
         .io = io,
@@ -37,11 +38,18 @@ pub fn main(init: std.process.Init) !void {
         .test_root = args[3],
         .workspace = args[4],
         .timeout_seconds = args[6],
+        .memory_kb = args[7],
     };
     const files = try source.readZigFiles(arena, io, args[2]);
     const report = try runner.run(files);
     try source.writeZon(arena, io, args[5], report);
 }
+
+/// Binário de teste de cada mutante, na pasta de trabalho.
+const mutant_bin = "mutant-test";
+/// Cache das compilações dos mutantes. Fica na pasta de trabalho e é apagado
+/// no fim: no cache principal, 150 compilações por execução enchiam o disco.
+const mutant_cache = ".zig-cache-mutants";
 
 const Runner = struct {
     arena: std.mem.Allocator,
@@ -50,8 +58,10 @@ const Runner = struct {
     test_root: []const u8,
     workspace: []const u8,
     timeout_seconds: []const u8,
+    memory_kb: []const u8,
 
     fn run(self: Runner, files: []const source.SourceFile) !Report {
+        defer self.deleteMutantCache();
         for (files) |f| try self.write(f.path, f.source);
         if (try self.runTests() != .survived) return .{ .baseline_ok = false };
 
@@ -85,6 +95,12 @@ const Runner = struct {
         return report;
     }
 
+    fn deleteMutantCache(self: Runner) void {
+        var ws = std.Io.Dir.cwd().openDir(self.io, self.workspace, .{}) catch return;
+        defer ws.close(self.io);
+        ws.deleteTree(self.io, mutant_cache) catch {};
+    }
+
     fn write(self: Runner, path: []const u8, data: []const u8) !void {
         var ws = try std.Io.Dir.cwd().openDir(self.io, self.workspace, .{});
         defer ws.close(self.io);
@@ -92,12 +108,17 @@ const Runner = struct {
         try ws.writeFile(self.io, .{ .sub_path = path, .data = data });
     }
 
+    /// Compila os testes da cópia (sem limite: o compilador reserva muita
+    /// memória virtual) e roda o binário com teto de tempo e de memória.
     fn runTests(self: Runner) !Outcome {
-        const result = try std.process.run(self.arena, self.io, .{
-            .argv = &.{ "timeout", self.timeout_seconds, self.zig, "test", self.test_root },
+        const compiled = try std.process.run(self.arena, self.io, .{
+            .argv = &.{ self.zig, "test", self.test_root, "--test-no-exec", "-femit-bin=" ++ mutant_bin, "--cache-dir", mutant_cache },
             .cwd = .{ .path = self.workspace },
         });
-        return classify(result.term, result.stderr);
+        if (!compiled.term.success()) return .no_compile;
+        const argv = limitedArgv(self.memory_kb, self.timeout_seconds, "./" ++ mutant_bin);
+        const ran = try std.process.run(self.arena, self.io, .{ .argv = &argv, .cwd = .{ .path = self.workspace } });
+        return classifyRun(ran.term);
     }
 };
 
@@ -259,43 +280,41 @@ pub const Outcome = enum { killed, survived, no_compile, timeout };
 /// Código de saída do `timeout` (coreutils) quando o tempo acaba.
 const timeout_exit_code = 124;
 
-/// Resultado de `zig test` sobre um mutante.
-pub fn classify(term: std.process.Child.Term, stderr: []const u8) Outcome {
-    switch (term) {
-        .exited => |code| {
-            if (code == 0) return .survived;
-            if (code == timeout_exit_code) return .timeout;
+/// Resultado de rodar o binário de teste de um mutante que compilou.
+/// (Mutante que não compila nem chega aqui: é `no_compile`.)
+pub fn classifyRun(term: std.process.Child.Term) Outcome {
+    return switch (term) {
+        .exited => |code| switch (code) {
+            0 => .survived,
+            timeout_exit_code => .timeout,
+            else => .killed,
         },
-        else => {},
-    }
-    return if (hasCompileError(stderr)) .no_compile else .killed;
+        else => .killed,
+    };
 }
 
-/// Erro de compilação tem a forma `arquivo.zig:linha:coluna: error:`.
-fn hasCompileError(stderr: []const u8) bool {
-    var lines = std.mem.splitScalar(u8, stderr, '\n');
-    while (lines.next()) |line| {
-        const zig_at = std.mem.indexOf(u8, line, ".zig:") orelse continue;
-        var parts = std.mem.splitScalar(u8, line[zig_at + ".zig:".len ..], ':');
-        const row = parts.next() orelse continue;
-        const col = parts.next() orelse continue;
-        const rest = parts.rest();
-        if (isNumber(row) and isNumber(col) and std.mem.startsWith(u8, rest, " error")) return true;
-    }
-    return false;
+test "classifyRun: passou é sobrevivente, 124 é tempo esgotado, o resto é morto" {
+    try std.testing.expectEqual(.survived, classifyRun(.{ .exited = 0 }));
+    try std.testing.expectEqual(.timeout, classifyRun(.{ .exited = timeout_exit_code }));
+    try std.testing.expectEqual(.killed, classifyRun(.{ .exited = 1 }));
+    try std.testing.expectEqual(.killed, classifyRun(.{ .signal = .ABRT }));
 }
 
-fn isNumber(s: []const u8) bool {
-    if (s.len == 0) return false;
-    for (s) |c| {
-        if (!std.ascii.isDigit(c)) return false;
-    }
-    return true;
+/// Comando que roda `bin` com teto de memória virtual e de tempo. Um mutante
+/// que aloca sem parar falha com `OutOfMemory` em vez de encher a máquina.
+pub fn limitedArgv(memory_kb: []const u8, seconds: []const u8, bin: []const u8) [7][]const u8 {
+    // Os valores entram como argumentos ($1, $2, $3), nunca colados no script.
+    const script = "ulimit -v \"$1\" && exec timeout \"$2\" \"$3\"";
+    return .{ "sh", "-c", script, "sh", memory_kb, seconds, bin };
 }
 
-test "classify: separa sobrevivente, morto, não compilou e tempo esgotado" {
-    try std.testing.expectEqual(.survived, classify(.{ .exited = 0 }, ""));
-    try std.testing.expectEqual(.killed, classify(.{ .exited = 1 }, "error: 'health.test.x' failed:\n"));
-    try std.testing.expectEqual(.no_compile, classify(.{ .exited = 1 }, "src/health.zig:18:22: error: expected type\n"));
-    try std.testing.expectEqual(.timeout, classify(.{ .exited = timeout_exit_code }, ""));
+test "limitedArgv: ulimit -v e timeout antes do binário, com os valores como argumentos" {
+    const argv = limitedArgv("1048576", "10", "./mutant-test");
+    try std.testing.expectEqualStrings("sh", argv[0]);
+    try std.testing.expectEqualStrings("-c", argv[1]);
+    try std.testing.expect(std.mem.indexOf(u8, argv[2], "ulimit -v \"$1\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, argv[2], "exec timeout \"$2\" \"$3\"") != null);
+    try std.testing.expectEqualStrings("1048576", argv[4]);
+    try std.testing.expectEqualStrings("10", argv[5]);
+    try std.testing.expectEqualStrings("./mutant-test", argv[6]);
 }
