@@ -5,6 +5,9 @@ pub const health = @import("health.zig");
 pub const vec = @import("vec.zig");
 pub const trail = @import("trail.zig");
 pub const config = @import("config.zig");
+pub const world = @import("world.zig");
+pub const mover = @import("systems/mover.zig");
+pub const seguir = @import("systems/seguir.zig");
 pub const testing = @import("testing.zig");
 
 /// Faz o compilador analisar todas as declarações públicas, também dentro
