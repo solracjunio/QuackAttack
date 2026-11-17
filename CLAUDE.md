@@ -29,7 +29,7 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 - `zig build test`: todos os testes (lógica e ferramentas). **Rodar antes de dar qualquer tarefa por terminada.**
 - `zig build test-headless`: só a lógica, sem linkar a raylib.
 - `devbox run windows`: compila o `.exe` do Windows em `zig-out/bin/`. Rode de novo sempre que `data/game.zon` ganhar campos: um `.exe` antigo recusa campos que não conhece. Abra o `.exe` a partir da raiz do projeto (ele lê `data/game.zon`).
-- `zig build run`: abre o jogo (←/→ ou A/D giram a líder; F1 liga o overlay de debug).
+- `zig build run`: abre o jogo (←/→ ou A/D giram a líder; F1 liga o overlay de debug; R recomeça no fim de jogo).
 - `zig build quality`: imports, números mágicos, complexidade, cobertura (kcov), mutação e commits `fix:`. Imprime as tabelas, atualiza o bloco gerado do `docs/medicoes.md` e reprova pelas regras do `PLANO.md`. No CI, as tabelas vão para o *Summary* da execução.
 - `zig fmt --check build.zig src/ tools/ data/check.zig`: formatação (o CI também confere).
 
@@ -53,13 +53,14 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 - Testes de um sistema não importam outro sistema (a regra vale também nos testes): montam o estado direto no `World`.
 - Helper de teste com contas ou números: declare dentro do bloco `test` (`const Helper = struct { fn ... };`). Fora dele, a mutação e os números mágicos o tratam como produção.
 - Floats nos testes: use valores exatos em binário (0.5, 0.25, 1.5). `1.9 + 0.1` em `f32` não dá `2`.
-- Ordem do passo (`src/sim.zig`): limpa os eventos, `mover`, `seguir`, `spawner`, `perseguir`, `mirar`, `atacar`, `magia`, `projeteis`, `contato`, `aplicar_dano`, `limpar_mortos`. Dano e morte só acontecem por eventos (`src/events.zig`); todo tipo de evento novo precisa de texto no `describe`.
+- Ordem do passo (`src/sim.zig`): limpa os eventos, `mover`, `seguir`, `spawner`, `perseguir`, `mirar`, `atacar`, `magia`, `projeteis`, `contato`, `aplicar_dano`, `limpar_mortos`, `ondas`. Com a vida da fila em 0 (fim de jogo), o passo não faz nada. Dano e morte só acontecem por eventos (`src/events.zig`); todo tipo de evento novo precisa de texto no `describe`.
 - Aleatoriedade só pelo `World.rng` (criado com a `seed` do `data/game.zon`). O teste de determinismo em `sim.zig` reprova se duas partidas iguais divergirem.
 - Classes: `data/classes.zon` (nome, aparência e ataque). Classe nova com ataque e acessório que já existem é só uma entrada lá (e, se quiser, um nome em `queue.start_classes`). Ataque novo = variante em `classes.Attack` + regras no `classes.validate` + um sistema que o use. A classe é uma tagged union de ataque; o patinho guarda o índice da classe.
 - Relacionamentos (`src/relations.zig`): `(Segue, líder)` e `(Mira, inimigo)`, com consulta por curinga (`query(.mira, .any)`). Todo patinho novo entra por `World.addDuck` (já com `(Segue, líder)`). Quem morre perde as relações que apontam para ele em `limpar_mortos`.
 - Fixtures de teste com números podem ficar em `.zon` dentro de `src/` (ex.: `src/example_classes.zon`): o `analyze` só lê `.zig`, e o `mutate` copia todos os arquivos.
 - Union também tem bytes de preenchimento com lixo: no hash, entra campo a campo (ver `World.feedEntity`).
-- Dados: `data/game.zon` e `data/classes.zon` são lidos quando o jogo abre (mudar não exige recompilar). Todo campo novo entra em `Config` (`src/config.zig`) e, se puder quebrar o jogo, ganha regra no `validate`. O `data/check.zig` confere os arquivos reais, juntos (inclusive as referências entre eles), no `zig build test`.
+- Ondas: `data/waves.zon` (inimigos e intervalo por onda, pausa entre ondas); depois da última, ela se repete. O `spawner` segue a onda atual; o `ondas` fecha a onda (eventos `wave_ended` e `duck_joined`), sorteia a classe do patinho novo pelo `World.rng` e começa a pausa.
+- Dados: `data/game.zon`, `data/classes.zon` e `data/waves.zon` são lidos quando o jogo abre (mudar não exige recompilar). Todo campo novo entra em `Config` (`src/config.zig`) e, se puder quebrar o jogo, ganha regra no `validate`. O `data/check.zig` confere os arquivos reais, juntos (inclusive as referências entre eles), no `zig build test`.
 - **Visual:** tudo o que aparece na tela segue `docs/guia-visual.md` (formas, sombras, paleta, HUD e o checklist de item novo). Cores só de `src/ui/palette.zig`; cor nova entra no guia e na paleta juntas. O desenho do mundo fica em `src/ui/scene.zig`, o HUD em `src/ui/hud.zig`, o brilho em `src/ui/glow.zig` e a montagem em camadas (fundo → brilho → atores) em `src/ui/render.zig`.
 - A lógica (`src/game.zig` e o que ele importa) **nunca** importa a raylib. Só `main.zig` e `src/ui/` usam a raylib.
 - Nenhum número de balanceamento no código: tudo em `data/`. Números de tela (tamanho da janela, fonte) podem ficar em `main.zig` e `ui/`.

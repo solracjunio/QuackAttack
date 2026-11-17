@@ -105,7 +105,17 @@ nada de cor solta no código de desenho.
   qualquer coisa.
 - **Ícones:** desenhados com primitivas, na cor do que representam (vida =
   coração `life`).
-- Informações novas entram na mesma coluna, com o mesmo padrão.
+- Linhas atuais: vida (coração `life`) e onda (bandeirinha `banner`).
+  Informações novas entram na mesma coluna, com o mesmo padrão.
+
+## Avisos no centro
+
+- **Pausa entre ondas:** "Onda N em X s", na cor `banner`, no terço de cima
+  da tela, com o mesmo texto contornado do HUD.
+- **Fim de jogo:** a cena escurece (`dim`), e no centro aparecem
+  "FIM DE JOGO" grande (tamanho 20 na cena) em `life`, a onda alcançada e
+  "R para recomeçar" em `text`. A coluna do HUD continua legível por cima do
+  escurecimento.
 
 ## Overlay de debug (F1)
 
@@ -131,7 +141,9 @@ nada de cor solta no código de desenho.
 | `bar_back` | `#16161A` | fundo das barras de vida |
 | `bar_fill` | `#FF3D5E` | preenchimento das barras de vida |
 | `arrow` | `#F5F5F5` | flechas |
-| `life` | `#FF4D6D` | ícone de vida |
+| `life` | `#FF4D6D` | ícone de vida, título de fim de jogo |
+| `banner` | `#C792EA` | ícone e aviso de onda |
+| `dim` | `#000000` a 55% | escurecimento da cena no fim de jogo |
 | `text` | `#FFFFFF` | texto do HUD |
 | `panel` | `#000000` a 65% | painel do overlay de debug |
 

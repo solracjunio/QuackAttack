@@ -120,6 +120,25 @@ Já uma classe que **reaproveita** um ataque e um acessório (por exemplo, um "b
 - **Fixtures em `.zon`:** as classes de exemplo dos testes ficaram num `.zon` dentro de `src/`. O `analyze` não conta números de `.zon`, e o Zig importa o arquivo com o tipo certo em tempo de compilação. Mas o `mutate` só copiava `.zig`, e a linha de base passou a falhar; agora ele copia tudo.
 - **Números mágicos em helpers de teste de novo:** 22, todos de posições de teste em helpers fora dos blocos `test`. A regra já estava no `CLAUDE.md`; o conserto foi passar as posições como argumento.
 
+## Fase 4: Ondas e fim de jogo (MVP jogável)
+
+| Medição | Valor |
+|---|---|
+| Tempo gasto | ~30 min |
+| API de Zig de outra versão escrita pelo Claude | 0 |
+| Testes da lógica | 124, mais 1 do `data/check.zig` (eram 111) |
+| Bugs pegos pelos testes | 0 |
+| Mutantes sobreviventes no primeiro `quality` | 3 → 0 (todos eram código redundante) |
+
+### Notas para o post
+
+- **Ondas como dados de verdade:** `data/waves.zon` diz quantos inimigos e com que intervalo; o `spawner` só segue a onda atual. Mudar a dificuldade é editar o arquivo e reabrir o jogo, sem recompilar (pilar Editável: "ondas vindas de dados").
+- **Os dois eventos que faltavam do plano** (`wave_ended`, `duck_joined`) entraram, e o `switch` exaustivo do `describe` obrigou a dar texto a eles antes de compilar. O overlay do F1 mostra o fim da onda e o patinho novo sem código extra.
+- **A mutação achou código redundante, não teste faltando.** Os 3 sobreviventes eram duas guardas que repetiam o que outra parte já garantia: a pausa no `ondas` (na pausa, a onda nova ainda não soltou ninguém) e o `return` antecipado no `spawner` (a condição do `while` já para). Removê-las deixou o código menor sem mudar nenhum teste.
+- **Fim de jogo é só um `if`:** com a vida em 0, o `sim.step` volta sem fazer nada e o mundo congela; a tela lê a onda alcançada direto do `World`. Recomeçar é recriar o `World` com a mesma configuração, e a mesma seed dá a mesma partida.
+- **Variáveis observáveis continuam sem fazer falta:** o HUD (vida e onda), os avisos de pausa e o fim de jogo leem o `World` direto, a cada frame. Para o MVP, a resposta da nota "O essencial" é: não precisou.
+- **Sorteio determinístico:** a classe do patinho novo vem do `World.rng`, e o teste de determinismo agora exige que a partida de teste passe de onda.
+
 <!-- quality:begin (gerado pelo zig build quality; não editar à mão) -->
 ## Qualidade (`zig build quality`)
 
@@ -136,51 +155,53 @@ Já uma classe que **reaproveita** um ataque e um acessório (por exemplo, um "b
 | Editável | Dados válidos | ✅ `data/check.zig` passou | Reprova se falhar |
 | Depurável | Determinismo (mesma seed, mesmo hash) | ✅ teste de `sim.zig` | Reprova se diferir |
 | Depurável | Todo evento aparece no debug | ✅ `switch` exaustivo em `events.describe` | Reprova no build |
-| Depurável | Commits `fix:` com teste | 🟢 1/1 | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |
+| Depurável | Commits `fix:` com teste | 🟢 2/2 | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |
 
 ### Testes
 
 | Medição | Valor | Regra |
 |---|---|---|
-| Cobertura (linhas) | 🟢 100.0% (546/546) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
-| Mutação | ✅ 0 sobrevivente(s); 141 morto(s), 1 por tempo esgotado, 75 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
-| Complexidade (maior) | 🟢 7 (`hash`, `world.zig:108`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
+| Cobertura (linhas) | 🟢 100.0% (584/584) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
+| Mutação | ✅ 0 sobrevivente(s); 161 morto(s), 1 por tempo esgotado, 79 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
+| Complexidade (maior) | 🟢 7 (`write`, `events.zig:29`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
 
 ### Cobertura por arquivo
 
 | Arquivo | Linhas | Cobertura |
 |---|---|---|
 | `testing.zig` | 5/5 | 🟢 100.0% |
-| `config.zig` | 41/41 | 🟢 100.0% |
+| `config.zig` | 42/42 | 🟢 100.0% |
 | `classes.zig` | 28/28 | 🟢 100.0% |
-| `events.zig` | 10/10 | 🟢 100.0% |
-| `sim.zig` | 13/13 | 🟢 100.0% |
-| `systems/mover.zig` | 21/21 | 🟢 100.0% |
-| `trail.zig` | 28/28 | 🟢 100.0% |
+| `events.zig` | 12/12 | 🟢 100.0% |
+| `sim.zig` | 15/15 | 🟢 100.0% |
 | `systems/seguir.zig` | 8/8 | 🟢 100.0% |
-| `systems/spawner.zig` | 17/17 | 🟢 100.0% |
-| `world.zig` | 75/75 | 🟢 100.0% |
-| `game.zig` | 5/5 | 🟢 100.0% |
-| `systems/aplicar_dano.zig` | 26/26 | 🟢 100.0% |
+| `systems/spawner.zig` | 22/22 | 🟢 100.0% |
 | `systems/perseguir.zig` | 17/17 | 🟢 100.0% |
+| `systems/magia.zig` | 23/23 | 🟢 100.0% |
+| `systems/aplicar_dano.zig` | 26/26 | 🟢 100.0% |
 | `health.zig` | 8/8 | 🟢 100.0% |
 | `vec.zig` | 12/12 | 🟢 100.0% |
-| `systems/limpar_mortos.zig` | 5/5 | 🟢 100.0% |
+| `game.zig` | 5/5 | 🟢 100.0% |
+| `world.zig` | 78/78 | 🟢 100.0% |
+| `systems/ondas.zig` | 12/12 | 🟢 100.0% |
+| `systems/mover.zig` | 21/21 | 🟢 100.0% |
+| `trail.zig` | 28/28 | 🟢 100.0% |
 | `relations.zig` | 45/45 | 🟢 100.0% |
+| `systems/limpar_mortos.zig` | 5/5 | 🟢 100.0% |
+| `systems/mirar.zig` | 35/35 | 🟢 100.0% |
+| `systems/projeteis.zig` | 24/24 | 🟢 100.0% |
+| `waves.zig` | 13/13 | 🟢 100.0% |
 | `pool.zig` | 43/43 | 🟢 100.0% |
 | `systems/atacar.zig` | 30/30 | 🟢 100.0% |
 | `systems/contato.zig` | 27/27 | 🟢 100.0% |
-| `systems/magia.zig` | 23/23 | 🟢 100.0% |
-| `systems/projeteis.zig` | 24/24 | 🟢 100.0% |
-| `systems/mirar.zig` | 35/35 | 🟢 100.0% |
 
 ### Funções mais complexas
 
 | Função | Onde | Complexidade |
 |---|---|---|
-| `hash` | `world.zig:108` | 🟢 7 |
+| `write` | `events.zig:29` | 🟢 7 |
+| `main` | `main.zig:18` | 🟢 7 |
+| `draw` | `ui/hud.zig:18` | 🟢 7 |
+| `hash` | `world.zig:115` | 🟢 7 |
 | `Pool` | `pool.zig:8` | 🟢 6 |
-| `update` | `systems/aplicar_dano.zig:7` | 🟢 6 |
-| `update` | `systems/atacar.zig:11` | 🟢 6 |
-| `anyContact` | `systems/contato.zig:15` | 🟢 6 |
 <!-- quality:end -->
