@@ -77,7 +77,9 @@
       "export LIBGL_DRIVERS_PATH=\"$DEVBOX_PACKAGES_DIR/lib/dri\"",
       "export LD_LIBRARY_PATH=\"$DEVBOX_PACKAGES_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"",
       "# WSLg: usa a GPU via D3D12 (libd3d12.so vem do Windows)",
-      "if [ -d /usr/lib/wsl/lib ]; then export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH:/usr/lib/wsl/lib\"; export GALLIUM_DRIVER=d3d12; fi"
+      "if [ -d /usr/lib/wsl/lib ]; then export LD_LIBRARY_PATH=\"$LD_LIBRARY_PATH:/usr/lib/wsl/lib\"; export GALLIUM_DRIVER=d3d12; fi",
+      "# /mnt/g é disco do Windows: renomear no .zig-cache falha (AccessDenied). Cache local fica no Linux.",
+      "export ZIG_LOCAL_CACHE_DIR=\"$HOME/.cache/zig-local/quackatack\""
     ],
     "scripts": {
       "build": "zig build",
