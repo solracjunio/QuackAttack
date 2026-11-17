@@ -86,7 +86,8 @@
       "run": "zig build run",
       "test": "zig build test",
       "test-headless": "zig build test-headless",
-      "quality": "zig build quality"
+      "quality": "zig build quality",
+      "windows": "zig build -Dtarget=x86_64-windows -Doptimize=ReleaseSafe"
     }
   }
 }
