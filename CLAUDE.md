@@ -23,10 +23,18 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 
 ## Comandos
 
-- `zig build test`: todos os testes. **Rodar antes de dar qualquer tarefa por terminada.**
+- `zig build test`: todos os testes (lógica e ferramentas). **Rodar antes de dar qualquer tarefa por terminada.**
 - `zig build test-headless`: só a lógica, sem linkar a raylib.
 - `zig build run`: abre o jogo.
-- `zig fmt --check build.zig src/`: formatação (o CI também confere).
+- `zig build quality`: imports, números mágicos, complexidade, cobertura (kcov), mutação e commits `fix:`. Imprime as tabelas, atualiza o bloco gerado do `docs/medicoes.md` e reprova pelas regras do `PLANO.md`. No CI, as tabelas vão para o *Summary* da execução.
+- `zig fmt --check build.zig src/ tools/`: formatação (o CI também confere).
+
+## Ferramentas de qualidade (`tools/`)
+
+- `source.zig` (AST comum), `analyze.zig`, `mutate.zig`, `report.zig`. Também seguem TDD; os testes delas rodam no `zig build test`.
+- `mutate` trabalha numa cópia de `src/` no cache do Zig: o código original nunca é alterado.
+- Os operadores de mutação não cobrem tudo (ex.: não removem um `@min`). Mutação limpa não prova que todo comportamento tem teste.
+- `src/game.zig` usa `refAllDeclsRecursive` para o Zig compilar até as funções que nenhum teste chama. Sem isso elas somem da cobertura em vez de aparecer como não cobertas. Todo arquivo de lógica novo precisa ser `pub const` no `game.zig`.
 
 ## Regras
 

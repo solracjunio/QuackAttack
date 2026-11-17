@@ -138,7 +138,7 @@ Além do TDD (skill `tdd`), o mesmo modelo do Partneroj (skill `quality-metrics`
 
 - quantos itens dos 3 pilares estão cumpridos;
 - as tabelas do `zig build quality`: cobertura, mutação, complexidade e indicadores dos pilares;
-- tempo gasto e número de prompts ao Claude por fase;
+- tempo gasto por fase;
 - **quantas vezes o Claude escreveu API de Zig de outra versão;**
 - quantidade de testes, e quantos bugs os testes pegaram;
 - quantas entidades na tela antes de o FPS cair (para saber se o ECS completo faria falta).
