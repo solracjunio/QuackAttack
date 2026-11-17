@@ -4,6 +4,15 @@ const expectVec = @import("testing.zig").expectVec;
 
 pub const Vec2 = @Vector(2, f32); // magic: allow — dimensão do vetor (2D), não é balanceamento
 
+/// As coordenadas sem preenchimento. No backend próprio do Zig, um
+/// `@Vector(2, f32)` ocupa 16 bytes, e os 8 de alinhamento têm lixo (no LLVM
+/// ocupa 8): nunca leia os bytes do vetor direto.
+pub const Array = [@typeInfo(Vec2).vector.len]f32;
+
+pub fn toArray(v: Vec2) Array {
+    return v;
+}
+
 pub fn scale(v: Vec2, s: f32) Vec2 {
     return v * @as(Vec2, @splat(s));
 }
@@ -39,4 +48,10 @@ test "scale: multiplica as duas coordenadas" {
 
 test "normalize: mantém o sentido e deixa o comprimento em 1" {
     try expectVec(.{ 0.6, 0.8 }, normalize(.{ 3, 4 }));
+}
+
+test "toArray: só as coordenadas, sem o preenchimento do vetor" {
+    try std.testing.expectEqual(Array{ 3, -4 }, toArray(.{ 3, -4 }));
+    // O tamanho do vetor depende do backend: 16 bytes no do Zig, 8 no LLVM.
+    try std.testing.expect(@sizeOf(Array) <= @sizeOf(Vec2));
 }

@@ -8,8 +8,16 @@ pub const events = @import("events.zig");
 pub const trail = @import("trail.zig");
 pub const config = @import("config.zig");
 pub const world = @import("world.zig");
+pub const sim = @import("sim.zig");
 pub const mover = @import("systems/mover.zig");
 pub const seguir = @import("systems/seguir.zig");
+pub const spawner = @import("systems/spawner.zig");
+pub const perseguir = @import("systems/perseguir.zig");
+pub const atacar = @import("systems/atacar.zig");
+pub const projeteis = @import("systems/projeteis.zig");
+pub const contato = @import("systems/contato.zig");
+pub const aplicar_dano = @import("systems/aplicar_dano.zig");
+pub const limpar_mortos = @import("systems/limpar_mortos.zig");
 pub const testing = @import("testing.zig");
 
 /// Faz o compilador analisar todas as declarações públicas, também dentro
