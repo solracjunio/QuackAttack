@@ -4,26 +4,14 @@ const rl = @import("raylib");
 const game = @import("game");
 const World = game.world.World;
 const Event = game.events.Event;
-const Vec2 = game.vec.Vec2;
-const hud = @import("ui/hud.zig");
 const debug = @import("ui/debug.zig");
+const Renderer = @import("ui/render.zig").Renderer;
 
 const data_path = "data/game.zon";
 
 /// Passo de frame mais longo que a simulação aceita, em segundos. Evita uma
 /// avalanche de passos depois de uma pausa (janela arrastada, depurador).
 const max_frame_seconds = 0.25;
-
-const leader_color: rl.Color = .orange;
-const duck_color: rl.Color = .yellow;
-const enemy_color: rl.Color = .red;
-const arrow_color: rl.Color = .white;
-const background: rl.Color = .dark_green;
-const eye_offset = 0.5; // fração do raio
-const eye_radius = 3;
-/// Piscadas por segundo da fila invulnerável.
-const blink_rate = 10;
-const blink_alpha = 0.35;
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
@@ -36,8 +24,12 @@ pub fn main(init: std.process.Init) !void {
     defer frame_events.deinit(gpa);
     var show_debug = false;
 
-    rl.initWindow(@intFromFloat(config.world.width), @intFromFloat(config.world.height), "QuackAttack");
+    const width: i32 = @intFromFloat(config.world.width);
+    const height: i32 = @intFromFloat(config.world.height);
+    rl.initWindow(width, height, "QuackAttack");
     defer rl.closeWindow();
+    const renderer: Renderer = try .init(width, height);
+    defer renderer.deinit();
 
     const step = 1.0 / @as(f32, @floatFromInt(config.ticks_per_second));
     var pending: f32 = 0;
@@ -50,11 +42,10 @@ pub fn main(init: std.process.Init) !void {
             try frame_events.appendSlice(gpa, world.events.items);
         }
 
+        renderer.render(world);
         rl.beginDrawing();
         defer rl.endDrawing();
-        rl.clearBackground(background);
-        draw(world);
-        hud.draw(world);
+        renderer.present();
         if (show_debug) debug.draw(world, frame_events.items);
     }
 }
@@ -81,35 +72,4 @@ fn readTurn() f32 {
     if (rl.isKeyDown(.right) or rl.isKeyDown(.d)) turn += 1;
     if (rl.isKeyDown(.left) or rl.isKeyDown(.a)) turn -= 1;
     return turn;
-}
-
-fn draw(world: World) void {
-    const cfg = world.config;
-    const e = world.enemies;
-    for (e.items.items(.pos), 0..) |pos, i| {
-        if (e.isAlive(i)) rl.drawCircleV(toRl(pos), cfg.enemy.radius, enemy_color);
-    }
-    const p = world.projectiles;
-    for (p.items.items(.pos), 0..) |pos, i| {
-        if (p.isAlive(i)) rl.drawCircleV(toRl(pos), cfg.projectile.radius, arrow_color);
-    }
-
-    // Invulnerável: a fila pisca.
-    const blink = world.invulnerable > 0 and @mod(world.invulnerable * blink_rate, 1) < 0.5;
-    const alpha: f32 = if (blink) blink_alpha else 1;
-    const ducks = world.ducks.items(.pos);
-    // Do fim da fila para a frente: quem vem antes fica por cima.
-    var i = ducks.len;
-    while (i > 0) {
-        i -= 1;
-        rl.drawCircleV(toRl(ducks[i]), cfg.queue.radius, duck_color.fade(alpha));
-    }
-    const l = world.leader;
-    rl.drawCircleV(toRl(l.pos), cfg.leader.radius, leader_color.fade(alpha));
-    // Um "olho" na frente, para ver a direção.
-    rl.drawCircleV(toRl(l.pos + game.vec.scale(l.heading, cfg.leader.radius * eye_offset)), eye_radius, .black);
-}
-
-fn toRl(v: Vec2) rl.Vector2 {
-    return .{ .x = v[0], .y = v[1] };
 }

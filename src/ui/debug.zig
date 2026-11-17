@@ -11,8 +11,9 @@ const line_height = 18;
 const font_size = 16;
 const max_event_lines = 20;
 const panel_width = 360;
-const panel: rl.Color = .{ .r = 0, .g = 0, .b = 0, .a = 170 };
-const text_color: rl.Color = .ray_white;
+const palette = @import("palette.zig");
+const panel = palette.panel;
+const text_color = palette.text;
 
 pub fn draw(w: World, frame_events: []const Event) void {
     var lines: usize = 0;
