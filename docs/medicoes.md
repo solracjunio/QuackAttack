@@ -103,7 +103,7 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 | Editável | Dados válidos | ✅ `data/check.zig` passou | Reprova se falhar |
 | Depurável | Determinismo (mesma seed, mesmo hash) | ✅ teste de `sim.zig` | Reprova se diferir |
 | Depurável | Todo evento aparece no debug | ✅ `switch` exaustivo em `events.describe` | Reprova no build |
-| Depurável | Commits `fix:` com teste | 🟢 nenhum commit `fix:` ainda | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |
+| Depurável | Commits `fix:` com teste | 🟢 1/1 | 🟢 100% · 🟡 ≥ 80% · 🔴 < 80% |
 
 ### Testes
 
@@ -111,7 +111,7 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 |---|---|---|
 | Cobertura (linhas) | 🟢 100.0% (386/386) | 🟢 ≥ 90% · 🟡 80–90% · 🔴 < 80% |
 | Mutação | ✅ 0 sobrevivente(s); 110 morto(s), 1 por tempo esgotado, 42 não compilou, 3 desativado(s) | Todo sobrevivente reprova |
-| Complexidade (maior) | 🟢 8 (`draw`, `main.zig:86`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
+| Complexidade (maior) | 🟢 6 (`Pool`, `pool.zig:8`) | 🟢 até 10 · 🟡 11–15 · 🔴 > 15 |
 
 ### Cobertura por arquivo
 
@@ -141,9 +141,9 @@ Métricas de cada fase, para o post. Ver "O que medir" no `PLANO.md`.
 
 | Função | Onde | Complexidade |
 |---|---|---|
-| `draw` | `main.zig:86` | 🟢 8 |
 | `Pool` | `pool.zig:8` | 🟢 6 |
 | `update` | `systems/aplicar_dano.zig:7` | 🟢 6 |
 | `anyContact` | `systems/contato.zig:15` | 🟢 6 |
 | `hash` | `world.zig:88` | 🟢 6 |
+| `write` | `events.zig:25` | 🟢 5 |
 <!-- quality:end -->

@@ -28,6 +28,7 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 
 - `zig build test`: todos os testes (lógica e ferramentas). **Rodar antes de dar qualquer tarefa por terminada.**
 - `zig build test-headless`: só a lógica, sem linkar a raylib.
+- `devbox run windows`: compila o `.exe` do Windows em `zig-out/bin/`. Rode de novo sempre que `data/game.zon` ganhar campos: um `.exe` antigo recusa campos que não conhece. Abra o `.exe` a partir da raiz do projeto (ele lê `data/game.zon`).
 - `zig build run`: abre o jogo (←/→ ou A/D giram a líder; F1 liga o overlay de debug).
 - `zig build quality`: imports, números mágicos, complexidade, cobertura (kcov), mutação e commits `fix:`. Imprime as tabelas, atualiza o bloco gerado do `docs/medicoes.md` e reprova pelas regras do `PLANO.md`. No CI, as tabelas vão para o *Summary* da execução.
 - `zig fmt --check build.zig src/ tools/ data/check.zig`: formatação (o CI também confere).
@@ -55,6 +56,7 @@ Roguelite de fila em Zig com raylib-zig. O plano completo e o escopo estão em `
 - Ordem do passo (`src/sim.zig`): limpa os eventos, `mover`, `seguir`, `spawner`, `perseguir`, `atacar`, `projeteis`, `contato`, `aplicar_dano`, `limpar_mortos`. Dano e morte só acontecem por eventos (`src/events.zig`); todo tipo de evento novo precisa de texto no `describe`.
 - Aleatoriedade só pelo `World.rng` (criado com a `seed` do `data/game.zon`). O teste de determinismo em `sim.zig` reprova se duas partidas iguais divergirem.
 - Dados: `data/game.zon` é lido quando o jogo abre (mudar não exige recompilar). Todo campo novo entra em `Config` (`src/config.zig`) e, se puder quebrar o jogo, ganha regra no `validate`. O `data/check.zig` confere os arquivos reais no `zig build test`.
+- **Visual:** tudo o que aparece na tela segue `docs/guia-visual.md` (formas, sombras, paleta, HUD e o checklist de item novo). Cores só de `src/ui/palette.zig`; cor nova entra no guia e na paleta juntas. O desenho do mundo fica em `src/ui/scene.zig`, o HUD em `src/ui/hud.zig`, o brilho em `src/ui/glow.zig` e a montagem em camadas (fundo → brilho → atores) em `src/ui/render.zig`.
 - A lógica (`src/game.zig` e o que ele importa) **nunca** importa a raylib. Só `main.zig` e `src/ui/` usam a raylib.
 - Nenhum número de balanceamento no código: tudo em `data/`. Números de tela (tamanho da janela, fonte) podem ficar em `main.zig` e `ui/`.
 - Sistemas não chamam uns aos outros: a comunicação é só pela fila de eventos.
