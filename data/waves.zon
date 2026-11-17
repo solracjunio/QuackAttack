@@ -1,0 +1,14 @@
+// Ondas de inimigos. Lidas quando o jogo abre: mudar aqui não exige recompilar.
+// Depois da última onda, ela se repete até a fila perder toda a vida.
+.{
+    // Segundos de pausa entre o fim de uma onda e o começo da próxima.
+    .break_time = 2.5,
+    .waves = .{
+        .{ .enemies = 5, .interval = 1.4 },
+        .{ .enemies = 8, .interval = 1.2 },
+        .{ .enemies = 12, .interval = 1.0 },
+        .{ .enemies = 16, .interval = 0.85 },
+        .{ .enemies = 22, .interval = 0.7 },
+        .{ .enemies = 30, .interval = 0.55 },
+    },
+}

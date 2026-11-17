@@ -1,0 +1,8 @@
+// Ondas de exemplo para os testes (as do jogo ficam em data/waves.zon).
+.{
+    .break_time = 2,
+    .waves = .{
+        .{ .enemies = 2, .interval = 1 },
+        .{ .enemies = 3, .interval = 0.5 },
+    },
+}

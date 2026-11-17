@@ -1,17 +1,27 @@
-//! Sistema `spawner`: a cada intervalo, um inimigo novo num ponto aleatório
-//! da borda do mundo (lado e posição vêm do gerador com a seed).
+//! Sistema `spawner`: segue a onda atual. Espera a pausa entre ondas e, no
+//! intervalo da onda, cria um inimigo num ponto aleatório da borda (lado e
+//! posição vêm do gerador com a seed), até a onda soltar todos os dela.
 const std = @import("std");
 const vec = @import("../vec.zig");
 const Vec2 = vec.Vec2;
 const World = @import("../world.zig").World;
+const waves = @import("../waves.zig");
 const expectVec = @import("../testing.zig").expectVec;
 
 const Side = enum { left, right, top, bottom };
 
 pub fn update(w: *World, gpa: std.mem.Allocator, dt: f32) !void {
+    if (w.wave_break > 0) {
+        w.wave_break = @max(w.wave_break - dt, 0);
+        return;
+    }
+    const wave = waves.at(w.config.waves, w.wave);
+    // Depois que a onda soltou todos, o temporizador segue descendo sem efeito:
+    // o `ondas` o reinicia quando a onda acaba.
     w.spawn_timer -= dt;
-    while (w.spawn_timer <= 0) : (w.spawn_timer += w.config.spawner.interval) {
+    while (w.spawn_timer <= 0 and w.wave_spawned < wave.enemies) : (w.spawn_timer += wave.interval) {
         _ = try w.enemies.add(gpa, .{ .pos = borderPoint(w), .health = .init(w.config.enemy.life) });
+        w.wave_spawned += 1;
     }
 }
 
@@ -39,32 +49,53 @@ fn pointOnSide(w: World, side: Side, t: f32) Vec2 {
 
 const config_example = @import("../config.zig").example;
 
-test "update: nada antes do intervalo; um inimigo quando o intervalo passa" {
+test "update: nada antes do intervalo da onda; um inimigo quando ele passa" {
     const gpa = std.testing.allocator;
-    var w: World = try .init(gpa, config_example()); // intervalo 2
+    var w: World = try .init(gpa, config_example()); // onda 1: 2 inimigos, a cada 1 s
     defer w.deinit(gpa);
-    // 1.5 + 0.5: valores exatos em binário (1.9 + 0.1 em f32 não fecha em 2).
-    try update(&w, gpa, 1.5);
+    try update(&w, gpa, 0.5);
     try std.testing.expectEqual(0, w.enemies.count);
     try update(&w, gpa, 0.5);
     try std.testing.expectEqual(1, w.enemies.count);
+    try std.testing.expectEqual(1, w.wave_spawned);
     try std.testing.expectEqual(w.config.enemy.life, w.enemies.items.items(.health)[0].current);
 }
 
-test "update: um passo longo que cobre dois intervalos cria dois inimigos" {
+test "update: um passo longo cria vários, mas nunca mais que os inimigos da onda" {
     const gpa = std.testing.allocator;
     var w: World = try .init(gpa, config_example());
     defer w.deinit(gpa);
-    try update(&w, gpa, 4.0);
+    try update(&w, gpa, 10);
     try std.testing.expectEqual(2, w.enemies.count);
+    try update(&w, gpa, 10);
+    try std.testing.expectEqual(2, w.enemies.count);
+}
+
+test "update: na pausa entre ondas não nasce ninguém; depois, nasce no ritmo da onda nova" {
+    const gpa = std.testing.allocator;
+    var w: World = try .init(gpa, config_example()); // onda 2: 3 inimigos, a cada 0.5 s
+    defer w.deinit(gpa);
+    w.wave = 1;
+    w.wave_break = 1;
+    w.spawn_timer = 0.5;
+    try update(&w, gpa, 0.75);
+    try std.testing.expectEqual(0, w.enemies.count);
+    try std.testing.expectEqual(0.25, w.wave_break);
+    try update(&w, gpa, 0.25);
+    try std.testing.expectEqual(0, w.wave_break);
+    try std.testing.expectEqual(0, w.enemies.count);
+    try update(&w, gpa, 0.5);
+    try std.testing.expectEqual(1, w.enemies.count);
 }
 
 test "update: nasce encostado numa borda, dentro do mundo, e usa os quatro lados" {
     const gpa = std.testing.allocator;
     var w: World = try .init(gpa, config_example()); // mundo 800x600, raio do inimigo 10
     defer w.deinit(gpa);
+    w.config.waves = .{ .break_time = 0, .waves = &.{.{ .enemies = 40, .interval = 1 }} };
     var seen: [4]bool = @splat(false);
-    for (0..40) |_| try update(&w, gpa, w.config.spawner.interval);
+    for (0..40) |_| try update(&w, gpa, 1);
+    try std.testing.expectEqual(40, w.enemies.count);
     for (w.enemies.items.items(.pos)) |p| {
         try std.testing.expect(p[0] >= 10 and p[0] <= 790 and p[1] >= 10 and p[1] <= 590);
         if (p[0] == 10) seen[0] = true;

@@ -9,6 +9,7 @@ pub const relations = @import("relations.zig");
 pub const trail = @import("trail.zig");
 pub const config = @import("config.zig");
 pub const classes = @import("classes.zig");
+pub const waves = @import("waves.zig");
 pub const world = @import("world.zig");
 pub const sim = @import("sim.zig");
 pub const mover = @import("systems/mover.zig");

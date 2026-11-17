@@ -3,6 +3,7 @@ const std = @import("std");
 const vec = @import("vec.zig");
 const classes_mod = @import("classes.zig");
 const Class = classes_mod.Class;
+const waves_mod = @import("waves.zig");
 const Vec2 = vec.Vec2;
 
 pub const Config = struct {
@@ -40,12 +41,10 @@ pub const Config = struct {
         /// Dano na fila quando encosta nela.
         contact_damage: u32,
     },
-    spawner: struct {
-        /// Segundos entre um inimigo e o próximo.
-        interval: f32,
-    },
     /// Vem de `data/classes.zon` (outro arquivo): o `main` preenche depois de ler.
     classes: []const Class = &.{},
+    /// Vem de `data/waves.zon` (outro arquivo): o `main` preenche depois de ler.
+    waves: waves_mod.Waves = .{ .break_time = 0, .waves = &.{} },
 };
 
 pub const ParseError = error{ OutOfMemory, ParseZon };
@@ -74,12 +73,12 @@ pub fn validate(c: Config) ?[]const u8 {
         .{ c.enemy.speed > 0, "enemy.speed precisa ser maior que 0" },
         .{ c.enemy.life > 0, "enemy.life precisa ser maior que 0" },
         .{ c.enemy.contact_damage > 0, "enemy.contact_damage precisa ser maior que 0" },
-        .{ c.spawner.interval > 0, "spawner.interval precisa ser maior que 0" },
     };
     for (checks) |check| {
         if (!check[0]) return check[1];
     }
     if (classes_mod.validate(c.classes)) |problem| return problem;
+    if (waves_mod.validate(c.waves)) |problem| return problem;
     return startClassesProblem(c);
 }
 
@@ -106,6 +105,7 @@ pub fn example() Config {
     // Os nomes do texto morrem com o arena: o exemplo usa a lista fixa abaixo.
     c.queue.start_classes = &example_start_classes;
     c.classes = classes_mod.example;
+    c.waves = waves_mod.example;
     return c;
 }
 
@@ -119,7 +119,6 @@ const sample =
     \\    .leader = .{ .start = .{ 400, 300 }, .start_heading = .{ 1, 0 }, .speed = 150, .turn_speed = 3, .radius = 12 },
     \\    .queue = .{ .start_classes = .{ "arqueiro", "arqueiro", "mago" }, .spacing = 26, .radius = 10, .life = 10, .invulnerable_time = 1 },
     \\    .enemy = .{ .radius = 10, .speed = 60, .life = 3, .contact_damage = 2 },
-    \\    .spawner = .{ .interval = 2 },
     \\}
 ;
 
@@ -191,9 +190,6 @@ test "validate: recusa valores que quebram o jogo" {
     c = base;
     c.enemy.contact_damage = 0;
     try std.testing.expect(validate(c) != null);
-    c = base;
-    c.spawner.interval = 0;
-    try std.testing.expect(validate(c) != null);
 }
 
 test "validate: invulnerable_time 0 é válido (sem invulnerabilidade)" {
@@ -233,5 +229,11 @@ test "validate: classes inválidas ou classe inicial que não existe" {
 
     c = example();
     c.queue.start_classes = &.{};
+    try std.testing.expect(validate(c) != null);
+}
+
+test "validate: ondas inválidas" {
+    var c = example();
+    c.waves = .{ .break_time = 1, .waves = &.{} };
     try std.testing.expect(validate(c) != null);
 }

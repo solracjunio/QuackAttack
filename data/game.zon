@@ -26,5 +26,4 @@
         .life = 3,
         .contact_damage = 1,
     },
-    .spawner = .{ .interval = 1.2 },
 }

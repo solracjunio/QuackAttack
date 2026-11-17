@@ -10,6 +10,7 @@ const Pool = @import("pool.zig").Pool;
 const Event = @import("events.zig").Event;
 const classes = @import("classes.zig");
 const relations = @import("relations.zig");
+const waves = @import("waves.zig");
 
 pub const Leader = struct {
     pos: Vec2,
@@ -60,6 +61,12 @@ pub const World = struct {
     invulnerable: f32 = 0,
     /// Segundos até o próximo inimigo.
     spawn_timer: f32,
+    /// Onda atual (0 = a primeira).
+    wave: u32 = 0,
+    /// Inimigos que já nasceram na onda atual.
+    wave_spawned: u32 = 0,
+    /// Segundos de pausa que restam antes da onda atual começar.
+    wave_break: f32 = 0,
 
     pub fn init(gpa: std.mem.Allocator, config: Config) !World {
         const start = config.leader.start;
@@ -69,7 +76,7 @@ pub const World = struct {
             .leader = .{ .pos = start, .heading = heading },
             .rng = .init(config.seed),
             .queue_health = .init(config.queue.life),
-            .spawn_timer = config.spawner.interval,
+            .spawn_timer = waves.at(config.waves, 0).interval,
         };
         errdefer w.deinit(gpa);
 
@@ -113,6 +120,9 @@ pub const World = struct {
         feed(&h, self.queue_health.current);
         feed(&h, self.invulnerable);
         feed(&h, self.spawn_timer);
+        feed(&h, self.wave);
+        feed(&h, self.wave_spawned);
+        feed(&h, self.wave_break);
         for (self.ducks.items(.pos)) |p| feedVec(&h, p);
         h.update(std.mem.sliceAsBytes(self.ducks.items(.cooldown)));
         h.update(std.mem.sliceAsBytes(self.ducks.items(.class)));
@@ -223,7 +233,8 @@ test "init: vida da fila cheia, sem inimigos nem flechas, spawn esperando o inte
     try std.testing.expectEqual(cfg.queue.life, w.queue_health.current);
     try std.testing.expectEqual(0, w.enemies.count);
     try std.testing.expectEqual(0, w.projectiles.count);
-    try std.testing.expectEqual(cfg.spawner.interval, w.spawn_timer);
+    try std.testing.expectEqual(cfg.waves.waves[0].interval, w.spawn_timer);
+    try std.testing.expectEqual(0, w.wave);
 }
 
 test "hash: mesmo estado, mesmo hash; qualquer mudança muda o hash" {
@@ -240,6 +251,22 @@ test "hash: mesmo estado, mesmo hash; qualquer mudança muda o hash" {
     try std.testing.expectEqual(a.hash(), b.hash());
 
     b.enemies.items.items(.health)[b.enemies.slot(h).?].damage(1);
+    try std.testing.expect(a.hash() != b.hash());
+}
+
+test "hash: muda com o estado da onda" {
+    const gpa = std.testing.allocator;
+    var a: World = try .init(gpa, config_example());
+    defer a.deinit(gpa);
+    var b: World = try .init(gpa, config_example());
+    defer b.deinit(gpa);
+    b.wave_spawned = 1;
+    try std.testing.expect(a.hash() != b.hash());
+    b.wave_spawned = 0;
+    b.wave = 1;
+    try std.testing.expect(a.hash() != b.hash());
+    b.wave = 0;
+    b.wave_break = 0.5;
     try std.testing.expect(a.hash() != b.hash());
 }
 

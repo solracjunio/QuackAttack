@@ -9,6 +9,7 @@ const Renderer = @import("ui/render.zig").Renderer;
 
 const game_path = "data/game.zon";
 const classes_path = "data/classes.zon";
+const waves_path = "data/waves.zon";
 
 /// Passo de frame mais longo que a simulação aceita, em segundos. Evita uma
 /// avalanche de passos depois de uma pausa (janela arrastada, depurador).
@@ -51,7 +52,7 @@ pub fn main(init: std.process.Init) !void {
     }
 }
 
-/// Lê `data/game.zon` e `data/classes.zon` e valida os dois juntos.
+/// Lê `data/game.zon`, `data/classes.zon` e `data/waves.zon` e valida tudo junto.
 /// Em erro, explica no terminal e encerra.
 fn loadConfig(init: std.process.Init) !game.config.Config {
     const arena = init.arena.allocator();
@@ -62,6 +63,10 @@ fn loadConfig(init: std.process.Init) !game.config.Config {
     };
     config.classes = game.classes.parse(arena, try readData(init, classes_path), &diag) catch |err| {
         diag.log(classes_path);
+        return err;
+    };
+    config.waves = game.waves.parse(arena, try readData(init, waves_path), &diag) catch |err| {
+        diag.log(waves_path);
         return err;
     };
     if (game.config.validate(config)) |problem| {

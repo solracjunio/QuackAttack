@@ -4,9 +4,10 @@
 const std = @import("std");
 const game = @import("game");
 
-test "data/game.zon e data/classes.zon: leem e passam no validate" {
+test "data/game.zon, classes.zon e waves.zon: leem e passam no validate" {
     var c: game.config.Config = @import("game.zon");
     c.classes = @import("classes.zon");
+    c.waves = @import("waves.zon");
     if (game.config.validate(c)) |problem| {
         std.debug.print("data/: {s}\n", .{problem});
         return error.InvalidData;
