@@ -1,0 +1,18 @@
+// Números de balanceamento do QuackAttack. Lidos quando o jogo abre:
+// mudar aqui não exige recompilar.
+.{
+    .ticks_per_second = 60,
+    .world = .{ .width = 960, .height = 540 },
+    .leader = .{
+        .start = .{ 480, 270 },
+        .start_heading = .{ 1, 0 },
+        .speed = 170,
+        .turn_speed = 3.6,
+        .radius = 14,
+    },
+    .queue = .{
+        .start_ducks = 4,
+        .spacing = 30,
+        .radius = 11,
+    },
+}

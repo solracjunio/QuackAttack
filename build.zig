@@ -30,14 +30,26 @@ pub fn build(b: *std.Build) void {
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     run_cmd.addPassthruArgs();
+    // O jogo lê `data/game.zon` relativo à raiz do projeto.
+    run_cmd.setCwd(b.path("."));
     b.step("run", "Abre o jogo").dependOn(&run_cmd.step);
 
     // Testes da lógica, sem linkar a raylib (pilar Modular).
     const game_tests = b.addTest(.{ .root_module = game });
     const run_game_tests = b.addRunArtifact(game_tests);
 
-    const headless_step = b.step("test-headless", "Testes da lógica, sem raylib");
+    // Dados válidos: lê os `data/*.zon` de verdade (pilar Editável).
+    const data_tests = b.addTest(.{ .root_module = b.createModule(.{
+        .root_source_file = b.path("data/check.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{.{ .name = "game", .module = game }},
+    }) });
+    const run_data_tests = b.addRunArtifact(data_tests);
+
+    const headless_step = b.step("test-headless", "Testes da lógica e dos dados, sem raylib");
     headless_step.dependOn(&run_game_tests.step);
+    headless_step.dependOn(&run_data_tests.step);
 
     // `test` roda tudo: a lógica e os testes das ferramentas de qualidade.
     const test_step = b.step("test", "Roda todos os testes");
@@ -47,7 +59,7 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&b.addRunArtifact(tool_tests).step);
     }
 
-    addQualityStep(b, target);
+    addQualityStep(b, target, &run_data_tests.step);
 }
 
 const quality_tools = [_][]const u8{ "source", "analyze", "mutate", "report" };
@@ -70,7 +82,7 @@ fn tool(b: *std.Build, name: []const u8) *std.Build.Step.Compile {
 /// (kcov), mutação e commits `fix:`. Gera o relatório e reprova se precisar.
 /// As ferramentas leem `src/` direto do disco, por isso rodam sempre
 /// (`has_side_effects`), sem depender do cache do build.
-fn addQualityStep(b: *std.Build, target: std.Build.ResolvedTarget) void {
+fn addQualityStep(b: *std.Build, target: std.Build.ResolvedTarget, data_check: *std.Build.Step) void {
     const src = b.path("src");
     const absolute: std.Build.Step.Run.PathArgOptions = .{ .make_absolute = true };
 
@@ -113,6 +125,8 @@ fn addQualityStep(b: *std.Build, target: std.Build.ResolvedTarget) void {
     report.addDirectoryArg2(src, absolute);
     report.addFileArg2(b.path("docs/medicoes.md"), absolute);
     report.has_side_effects = true;
+    // O relatório só sai se os dados forem válidos: senão o quality já reprova aqui.
+    report.step.dependOn(data_check);
 
     b.step("quality", "Métricas de qualidade com semáforo; reprova pelas regras do PLANO.md").dependOn(&report.step);
 }
