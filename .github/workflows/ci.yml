@@ -7,7 +7,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -17,8 +17,28 @@ jobs:
           version: 0.17.0
 
       - name: Formatação
-        run: zig fmt --check build.zig src/
+        run: zig fmt --check build.zig src/ tools/
 
-      # Só a lógica: não compila a raylib, então não precisa de X11 nem OpenGL.
+      # Lógica do jogo e ferramentas: não compila a raylib, então não precisa de X11 nem OpenGL.
       - name: Testes
         run: zig build test --summary all
+
+  quality:
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # O indicador "commits fix: com teste" lê o histórico inteiro.
+          fetch-depth: 0
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+
+      # Ubuntu 26.04 traz o kcov 43, a mesma versão do devbox.
+      - name: Instalar kcov
+        run: sudo apt-get update && sudo apt-get install -y kcov
+
+      # As tabelas vão para o Summary desta execução (GITHUB_STEP_SUMMARY).
+      - name: zig build quality
+        run: zig build quality
