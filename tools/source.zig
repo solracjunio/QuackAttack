@@ -58,14 +58,28 @@ pub fn isScreenCode(path: []const u8) bool {
 
 /// Lê todos os `.zig` de `dir_path`, recursivamente, em ordem de caminho.
 pub fn readZigFiles(arena: std.mem.Allocator, io: std.Io, dir_path: []const u8) ![]SourceFile {
+    return readFiles(arena, io, dir_path, ".zig");
+}
+
+/// Lê os arquivos de `dir_path` que terminam em `suffix` (todos, se null),
+/// recursivamente, em ordem de caminho.
+pub fn readFiles(arena: std.mem.Allocator, io: std.Io, dir_path: []const u8, suffix: ?[]const u8) ![]SourceFile {
     var dir = try std.Io.Dir.cwd().openDir(io, dir_path, .{ .iterate = true });
     defer dir.close(io);
+    return readFilesIn(arena, io, dir, suffix);
+}
+
+/// Como `readFiles`, num diretório já aberto (com `.iterate = true`).
+pub fn readFilesIn(arena: std.mem.Allocator, io: std.Io, dir: std.Io.Dir, suffix: ?[]const u8) ![]SourceFile {
     var walker = try dir.walk(arena);
     defer walker.deinit();
 
     var files: std.ArrayList(SourceFile) = .empty;
     while (try walker.next(io)) |entry| {
-        if (entry.kind != .file or !std.mem.endsWith(u8, entry.path, ".zig")) continue;
+        if (entry.kind != .file) continue;
+        if (suffix) |wanted| {
+            if (!std.mem.endsWith(u8, entry.path, wanted)) continue;
+        }
         const text = try dir.readFileAllocOptions(io, entry.path, arena, .unlimited, .of(u8), 0);
         try files.append(arena, .{ .path = try arena.dupe(u8, entry.path), .source = text });
     }
@@ -176,4 +190,24 @@ test "isCovered: vale na linha e na de baixo, só com motivo" {
     try std.testing.expect(isCovered(&ds, 2));
     try std.testing.expect(!isCovered(&ds, 3));
     try std.testing.expect(!isCovered(&ds, 6));
+}
+
+test "readFilesIn: sem filtro lê todos os arquivos (inclusive .zon), em ordem; com filtro, só os do sufixo" {
+    var arena: std.heap.ArenaAllocator = .init(std.testing.allocator);
+    defer arena.deinit();
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{ .iterate = true });
+    defer tmp.cleanup();
+    try tmp.dir.createDirPath(io, "sub");
+    try tmp.dir.writeFile(io, .{ .sub_path = "b.zig", .data = "const b = 1;" });
+    try tmp.dir.writeFile(io, .{ .sub_path = "sub/a.zon", .data = ".{}" });
+
+    const all = try readFilesIn(arena.allocator(), io, tmp.dir, null);
+    try std.testing.expectEqual(2, all.len);
+    try std.testing.expectEqualStrings("b.zig", all[0].path);
+    try std.testing.expectEqualStrings("sub/a.zon", all[1].path);
+    try std.testing.expectEqualStrings(".{}", all[1].source);
+
+    const zig_only = try readFilesIn(arena.allocator(), io, tmp.dir, ".zig");
+    try std.testing.expectEqual(1, zig_only.len);
 }

@@ -40,7 +40,8 @@ pub fn main(init: std.process.Init) !void {
         .timeout_seconds = args[6],
         .memory_kb = args[7],
     };
-    const files = try source.readZigFiles(arena, io, args[2]);
+    // Todos os arquivos (ex.: `.zon` importados pelos testes); só os `.zig` são mutados.
+    const files = try source.readFiles(arena, io, args[2], null);
     const report = try runner.run(files);
     try source.writeZon(arena, io, args[5], report);
 }
@@ -69,7 +70,7 @@ const Runner = struct {
         var survivors: std.ArrayList(Report.Survivor) = .empty;
         var missing: std.ArrayList(Report.Place) = .empty;
         for (files) |f| {
-            if (source.isScreenCode(f.path)) continue;
+            if (!std.mem.endsWith(u8, f.path, ".zig") or source.isScreenCode(f.path)) continue;
             const p: Parsed = try .init(self.arena, f.source);
             const ds = try directives(self.arena, f.source);
             for (ds) |d| {
