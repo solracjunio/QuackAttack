@@ -6,7 +6,8 @@ const World = game.world.World;
 const Event = game.events.Event;
 
 const x = 12;
-const top = 48;
+/// Logo abaixo da coluna do HUD (que é desenhada na cena, em resolução baixa).
+const top = (@import("hud.zig").bottom + 4) * @import("scene.zig").pixel_scale;
 const line_height = 18;
 const font_size = 16;
 const max_event_lines = 20;

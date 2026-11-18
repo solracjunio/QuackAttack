@@ -14,6 +14,11 @@ const title_size = 20;
 const icon_size = 8;
 const gap = 4;
 const row_height = 12;
+/// Linhas da coluna do HUD (vida e onda).
+const rows = 2;
+/// Onde a coluna do HUD termina, em pixels da cena: quem desenha embaixo dela
+/// (o overlay de debug) começa daqui.
+pub const bottom = margin + rows * row_height;
 
 pub fn draw(w: World) void {
     const width: i32 = @intFromFloat(w.config.world.width / scene.pixel_scale);
